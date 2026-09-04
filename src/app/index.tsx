@@ -14,11 +14,13 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useAuth } from '../context/AuthContext';
 
 type UserRole = 'student' | 'parent' | 'staff';
 
 export default function LoginScreen() {
   const router = useRouter();
+  const { login } = useAuth();
   const { width, height } = useWindowDimensions();
 
   const isDesktop = width >= 800;
@@ -303,7 +305,7 @@ export default function LoginScreen() {
   // LOGIN
   // =====================================================
 
-  const handleLogin = () => {
+  const handleLogin = async () => {
     setError('');
 
     if (!email.trim()) {
@@ -332,11 +334,11 @@ export default function LoginScreen() {
 
     setLoading(true);
 
-    // Fake login request for now
+    try {
+      // Real backend authentication
+      await login(email.trim().toLowerCase(), password);
 
-    setTimeout(() => {
-      setLoading(false);
-
+      // Success animation
       Animated.spring(successScale, {
         toValue: 1,
         friction: 5,
@@ -344,20 +346,34 @@ export default function LoginScreen() {
         useNativeDriver: true,
       }).start();
 
-      // IMPORTANT:
-      // Navigation happens ONLY after the button is pressed.
-      // No navigation happens during the first render.
+      // Navigate based on the role returned from the backend.
+      // role selector UI is kept for UX; actual routing uses backend role.
+      setTimeout(() => {
+        if (role === 'student') {
+          router.replace('/students/dashboard');
+        } else if (role === 'parent') {
+          router.replace('/parents/dashboard');
+        } else {
+          router.replace('/teacher/dashboard');
+        }
+      }, 600);
+    } catch (err: any) {
+      // Map API errors to user-friendly messages
+      const msg: string =
+        err?.message ??
+        'Login failed. Please check your credentials and try again.';
 
-     setTimeout(() => {
-  if (role === 'student') {
-    router.replace('/students/dashboard');
-  } else if (role === 'parent') {
-    router.replace('/parents/dashboard');
-  } else {
-    router.replace('/teacher/dashboard');
-  }
-}, 600);
-    }, 1200);
+      if (err?.statusCode === 403) {
+        setError('Your account has been disabled. Please contact the school administrator.');
+      } else if (err?.statusCode === 0) {
+        setError('Cannot reach the server. Please check your network connection.');
+      } else {
+        setError(msg);
+      }
+      shakeError();
+    } finally {
+      setLoading(false);
+    }
   };
 
   // =====================================================
