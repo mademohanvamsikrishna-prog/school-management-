@@ -29,12 +29,13 @@ from fastapi.responses import JSONResponse
 from app.core.config import settings
 
 # ---------------------------------------------------------------------------
-# API v1 router placeholder — domain routers will be registered here
-# in Priority 3+ as they are implemented.
+# API v1 router — domain routers are registered here as they are implemented.
 # ---------------------------------------------------------------------------
 from fastapi import APIRouter
+from app.routers import auth as auth_router
 
 api_v1_router = APIRouter(prefix="/api/v1")
+api_v1_router.include_router(auth_router.router)
 
 # ---------------------------------------------------------------------------
 # Startup / shutdown lifecycle

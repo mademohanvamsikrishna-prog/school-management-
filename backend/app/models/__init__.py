@@ -26,6 +26,8 @@ from app.models.communication import (
     conversation_participants,
 )
 from app.models.finance import FeeCategory, FeeInvoice, PaymentRecord
+from app.models.refresh_token import RefreshToken
+
 
 __all__ = [
     "Base",
@@ -54,4 +56,6 @@ __all__ = [
     "FeeCategory",
     "FeeInvoice",
     "PaymentRecord",
+    "RefreshToken",
 ]
+

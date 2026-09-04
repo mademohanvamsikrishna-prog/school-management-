@@ -22,5 +22,7 @@ export interface AuthSession {
     role: 'admin' | 'teacher' | 'student' | 'parent' | 'staff';
     permissions: string[];
     avatarUrl?: string;
+    /** Optional — from /auth/me response (snake_case mapped by auth.ts) */
+    avatar_url?: string;
   };
 }
