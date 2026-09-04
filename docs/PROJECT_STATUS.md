@@ -14,7 +14,7 @@
 
 | Phase | Phase Name | Status | UI | Backend | DB | Tests | Overall Score |
 |:-----:|:-----------|:------:|:--:|:-------:|:--:|:-----:|:-------------:|
-| **01** | Project Setup & Core Architecture | 🟡 Partially complete | 🟡 60% | 🔴 0% | 🔴 0% | 🔴 0% | **25%** |
+| **01** | Project Setup & Core Architecture | 🟡 Partially complete | 🟢 85% | 🔴 0% | 🔴 0% | 🔴 0% | **35%** |
 | **02** | Authentication + RBAC | 🟠 UI/mock only | 🟡 50% | 🔴 0% | 🔴 0% | 🔴 0% | **15%** |
 | **03** | Users + Profiles | 🟠 UI/mock only | 🟠 40% | 🔴 0% | 🔴 0% | 🔴 0% | **15%** |
 | **04** | Dashboard (Role-aware) | 🟡 Partially complete | 🟢 80% | 🔴 0% | 🔴 0% | 🔴 0% | **35%** |
