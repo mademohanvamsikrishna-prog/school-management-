@@ -16,7 +16,7 @@ interface UseApiState<T> {
 
 export function useApi<T>(
   fetcher: () => Promise<T>,
-  deps: any[] = [],
+  deps: unknown[] = [],
 ): UseApiState<T> {
   const [data, setData] = useState<T | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -28,10 +28,11 @@ export function useApi<T>(
     try {
       const result = await fetcher();
       setData(result);
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const apiErr = err as Partial<ApiError>;
       setError({
-        statusCode: err?.statusCode ?? 0,
-        message: err?.message ?? 'An unexpected error occurred.',
+        statusCode: apiErr?.statusCode ?? 0,
+        message: apiErr?.message ?? 'An unexpected error occurred.',
       });
     } finally {
       setLoading(false);

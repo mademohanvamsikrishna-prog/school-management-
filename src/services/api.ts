@@ -4,6 +4,13 @@ import { ApiError } from './types';
 
 const TOKEN_STORAGE_KEY = '@auth_access_token';
 
+/** Shape of an error response body from the FastAPI backend. */
+interface ApiErrorBody {
+  detail?: string;
+  message?: string;
+  errors?: Record<string, string[]>;
+}
+
 class ApiClient {
   private baseUrl: string;
 
@@ -52,9 +59,9 @@ class ApiClient {
       clearTimeout(timer);
 
       if (!response.ok) {
-        let errorData: any = {};
+        let errorData: ApiErrorBody = {};
         try {
-          errorData = await response.json();
+          errorData = (await response.json()) as ApiErrorBody;
         } catch {
           errorData = { detail: response.statusText };
         }
@@ -77,12 +84,13 @@ class ApiClient {
       }
 
       return (await response.json()) as T;
-    } catch (err: any) {
+    } catch (err: unknown) {
       clearTimeout(timer);
-      if (err.statusCode) {
+      const typedErr = err as Partial<ApiError> & { name?: string };
+      if (typedErr.statusCode) {
         throw err;
       }
-      if (err.name === 'AbortError') {
+      if (typedErr.name === 'AbortError') {
         const timeoutError: ApiError = {
           statusCode: 408,
           message: 'Request timed out. Please check your network connection.',
@@ -91,7 +99,7 @@ class ApiClient {
       }
       const networkError: ApiError = {
         statusCode: 0,
-        message: err.message || 'Network request failed. Is the backend server running?',
+        message: typedErr.message || 'Network request failed. Is the backend server running?',
       };
       throw networkError;
     }
@@ -103,7 +111,7 @@ class ApiClient {
 
   public async post<T>(
     endpoint: string,
-    data?: any,
+    data?: unknown,
     headers?: Record<string, string>
   ): Promise<T> {
     return this.request<T>(endpoint, {
@@ -115,7 +123,7 @@ class ApiClient {
 
   public async put<T>(
     endpoint: string,
-    data?: any,
+    data?: unknown,
     headers?: Record<string, string>
   ): Promise<T> {
     return this.request<T>(endpoint, {
@@ -127,7 +135,7 @@ class ApiClient {
 
   public async patch<T>(
     endpoint: string,
-    data?: any,
+    data?: unknown,
     headers?: Record<string, string>
   ): Promise<T> {
     return this.request<T>(endpoint, {
