@@ -20,7 +20,7 @@ type UserRole = 'student' | 'parent' | 'staff';
 
 export default function LoginScreen() {
   const router = useRouter();
-  const { login } = useAuth();
+  const { login, user } = useAuth();
   const { width, height } = useWindowDimensions();
 
   const isDesktop = width >= 800;
@@ -347,15 +347,22 @@ export default function LoginScreen() {
         useNativeDriver: true,
       }).start();
 
-      // Navigate based on the role returned from the backend.
-      // role selector UI is kept for UX; actual routing uses backend role.
+      // Navigate based on the role returned from the backend (user.role).
+      // The UI role selector is kept as a visual helper only.
       setTimeout(() => {
-        if (role === 'student') {
+        const serverRole = user?.role;
+        if (serverRole === 'admin') {
+          router.replace('/admin/dashboard');
+        } else if (serverRole === 'teacher' || serverRole === 'staff') {
+          router.replace('/teacher/dashboard');
+        } else if (serverRole === 'student') {
           router.replace('/students/dashboard');
-        } else if (role === 'parent') {
+        } else if (serverRole === 'parent') {
           router.replace('/parents/dashboard');
         } else {
-          router.replace('/teacher/dashboard');
+          // Unknown role — surface a clear error instead of silently misdirecting
+          setError(`Unrecognised account role "${serverRole}". Please contact your administrator.`);
+          shakeError();
         }
       }, 600);
     } catch (err: any) {
