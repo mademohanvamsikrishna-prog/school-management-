@@ -1,11 +1,12 @@
 import React from 'react';
-import { ScrollView, View, StyleSheet, SafeAreaView, ActivityIndicator, Text } from 'react-native';
+import { ScrollView, View, StyleSheet, SafeAreaView, Text } from 'react-native';
 import { useRouter } from 'expo-router';
 import { AppHeader } from '../../components/AppHeader';
 import { DashboardSection } from '../../components/DashboardSection';
 import { StatCard } from '../../components/StatCard';
 import { EventCard } from '../../components/EventCard';
 import { QuickActionButton } from '../../components/QuickActionButton';
+import { LoadingScreen, ErrorScreen } from '../../components/ScreenStates';
 import { COLORS, SIZES } from '../../constants/theme';
 import { useAuth } from '../../context/AuthContext';
 import { useApi } from '../../hooks/useApi';
@@ -18,7 +19,7 @@ export default function StudentDashboard() {
   const router = useRouter();
   const { user } = useAuth();
   
-  const { data: summary, loading: summaryLoading } = useApi(getDashboardSummary);
+  const { data: summary, loading: summaryLoading, refetch: refetchSummary } = useApi(getDashboardSummary);
   const { data: events, loading: eventsLoading } = useApi(() => getEvents(true));
   const { data: profile } = useApi(getMyProfile);
 
@@ -38,16 +39,20 @@ export default function StudentDashboard() {
   );
 
   const isLoading = summaryLoading || eventsLoading || timetableLoading;
+  const firstError = summary === null && !summaryLoading
+    ? { statusCode: 0, message: 'Could not load dashboard data.' }
+    : null;
 
-  if (isLoading || !summary || !user) {
-    return (
-      <SafeAreaView style={styles.safeArea}>
-        <View style={styles.centerContainer}>
-          <ActivityIndicator size="large" color={COLORS.primary} />
-          <Text style={styles.loadingText}>Loading Dashboard...</Text>
-        </View>
-      </SafeAreaView>
-    );
+  if (isLoading) {
+    return <LoadingScreen message="Loading Dashboard..." />;
+  }
+
+  if (firstError) {
+    return <ErrorScreen error={firstError} onRetry={refetchSummary} />;
+  }
+
+  if (!summary || !user) {
+    return <LoadingScreen message="Loading Dashboard..." />;
   }
 
   return (

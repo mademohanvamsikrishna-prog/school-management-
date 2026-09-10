@@ -91,9 +91,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           };
           setUser(restoredUser);
           setToken(session.accessToken);
-        } catch (err: any) {
+        } catch (err: unknown) {
           // 401 → token expired or invalid → clear session silently
-          console.warn('[Auth] Session validation failed, clearing:', err?.message);
+          const msg = err instanceof Error ? err.message : String(err);
+          console.warn('[Auth] Session validation failed, clearing:', msg);
           await _clearLocalSession();
         }
       } catch (err) {
