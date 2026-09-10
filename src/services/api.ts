@@ -125,6 +125,18 @@ class ApiClient {
     });
   }
 
+  public async patch<T>(
+    endpoint: string,
+    data?: any,
+    headers?: Record<string, string>
+  ): Promise<T> {
+    return this.request<T>(endpoint, {
+      method: 'PATCH',
+      body: data ? JSON.stringify(data) : undefined,
+      headers,
+    });
+  }
+
   public async delete<T>(endpoint: string, headers?: Record<string, string>): Promise<T> {
     return this.request<T>(endpoint, { method: 'DELETE', headers });
   }

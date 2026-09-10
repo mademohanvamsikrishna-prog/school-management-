@@ -1,5 +1,5 @@
 import React from 'react';
-import { ScrollView, View, StyleSheet, SafeAreaView } from 'react-native';
+import { ScrollView, View, StyleSheet, SafeAreaView, ActivityIndicator, Text } from 'react-native';
 import { useRouter } from 'expo-router';
 import { AppHeader } from '../../components/AppHeader';
 import { DashboardSection } from '../../components/DashboardSection';
@@ -7,58 +7,100 @@ import { StatCard } from '../../components/StatCard';
 import { EventCard } from '../../components/EventCard';
 import { QuickActionButton } from '../../components/QuickActionButton';
 import { COLORS, SIZES } from '../../constants/theme';
-import { teachers, mockEvents, mockTimetable } from '../../mock';
+import { useAuth } from '../../context/AuthContext';
+import { useApi } from '../../hooks/useApi';
+import { getDashboardSummary } from '../../services/dashboard';
+import { getEvents } from '../../services/events';
+import { getTeacherTimetable } from '../../services/timetable';
+import { getMyProfile } from '../../services/profile';
 
 export default function TeacherDashboard() {
   const router = useRouter();
-  const teacher = teachers[0];
+  const { user } = useAuth();
+  
+  const { data: summary, loading: summaryLoading } = useApi(getDashboardSummary);
+  const { data: events, loading: eventsLoading } = useApi(() => getEvents(true));
+  const { data: profile } = useApi(getMyProfile);
+
+  // Today's day of week (1=Monday ... 6=Saturday) - mapping JS getDay (0=Sun, 1=Mon) to backend format
+  const jsDay = new Date().getDay();
+  const backendDay = jsDay === 0 ? 7 : jsDay; 
+
+  const { data: timetable, loading: timetableLoading } = useApi(
+    async () => {
+      if (!user) return [];
+      return getTeacherTimetable(user.id, backendDay);
+    },
+    [user, backendDay]
+  );
+
+  const isLoading = summaryLoading || eventsLoading || timetableLoading;
+
+  if (isLoading || !summary || !user) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.centerContainer}>
+          <ActivityIndicator size="large" color={COLORS.primary} />
+          <Text style={styles.loadingText}>Loading Dashboard...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.safeArea}>
       <AppHeader
-        title={`Good Morning, ${teacher.name.split(' ')[0]}`}
-        subtitle={`${teacher.department} Department`}
-        avatarUrl={teacher.avatarUrl}
+        title={`Good Morning, ${user.name.split(' ')[0]}`}
+        subtitle={`${profile?.teacher_profile?.department || 'Staff'} Department`}
+        avatarUrl={user.avatarUrl}
       />
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.container}>
         
         {/* Today's Classes */}
         <DashboardSection title="Today's Classes">
-          {mockTimetable.slice(0, 2).map((entry) => (
-            <View key={entry.id} style={styles.timetableItem}>
-               <StatCard 
-                 title={`${entry.startTime} - ${entry.endTime}`} 
-                 value={entry.subjectName} 
-                 subtitle={`Class: 10-A | ${entry.roomNumber}`} 
-               />
-            </View>
-          ))}
+          {timetable && timetable.length > 0 ? (
+            timetable.slice(0, 2).map((entry) => (
+              <View key={entry.id} style={styles.timetableItem}>
+                 <StatCard 
+                   title={`${entry.start_time} - ${entry.end_time}`} 
+                   value={entry.subject_name || 'Unknown'} 
+                   subtitle={`Class: ${entry.class_name || 'Unknown'} | ${entry.room_number}`} 
+                 />
+              </View>
+            ))
+          ) : (
+            <Text style={styles.emptyText}>No classes scheduled for today.</Text>
+          )}
         </DashboardSection>
 
         {/* Quick Actions */}
         <DashboardSection title="Quick Actions">
           <View style={styles.quickActions}>
-            <QuickActionButton title="Mark Attendance" icon="✅" onPress={() => {}} />
-            <QuickActionButton title="Enter Marks" icon="📝" onPress={() => {}} />
+            <QuickActionButton title="Mark Attendance" icon="✅" onPress={() => router.push('/teacher/classes')} />
+            <QuickActionButton title="Enter Marks" icon="📝" onPress={() => router.push('/teacher/classes')} />
             <QuickActionButton title="My Classes" icon="👥" onPress={() => router.push('/teacher/classes')} />
-            <QuickActionButton title="Tasks" icon="📋" onPress={() => router.push('/teacher/tasks')} />
+            <QuickActionButton title="Profile" icon="👤" onPress={() => router.push('/teacher/profile')} />
           </View>
         </DashboardSection>
 
         {/* Pending Tasks */}
-        <DashboardSection title="Pending Tasks">
+        <DashboardSection title="Overview">
           <View style={styles.row}>
-            <StatCard title="Assignments" value="12" subtitle="To Review" icon="📄" color={COLORS.warning} style={styles.flex1} />
-            <StatCard title="Requests" value="3" subtitle="Pending" icon="📩" color={COLORS.info} style={styles.flex1} />
+            <StatCard title="Classes" value={summary.total_classes?.toString() || "0"} subtitle="Assigned" icon="👥" color={COLORS.info} style={styles.flex1} />
+            <StatCard title="Students" value={summary.students_count?.toString() || "0"} subtitle="Total" icon="🎓" color={COLORS.success} style={styles.flex1} />
           </View>
         </DashboardSection>
 
         {/* Events */}
         <DashboardSection title="Upcoming Events">
           <View style={{ gap: SIZES.md }}>
-            {mockEvents.map((event) => (
-              <EventCard key={event.id} {...event} />
-            ))}
+            {events && events.length > 0 ? (
+              events.slice(0, 3).map((event) => (
+                <EventCard key={event.id} {...event} />
+              ))
+            ) : (
+               <Text style={styles.emptyText}>No upcoming events.</Text>
+            )}
           </View>
         </DashboardSection>
 
@@ -74,6 +116,15 @@ const styles = StyleSheet.create({
   },
   container: {
     paddingVertical: SIZES.md,
+  },
+  centerContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: SIZES.sm,
+    color: COLORS.textLight,
   },
   row: {
     flexDirection: 'row',
@@ -91,4 +142,9 @@ const styles = StyleSheet.create({
     gap: SIZES.md,
     justifyContent: 'space-between',
   },
+  emptyText: {
+    color: COLORS.textLight,
+    fontStyle: 'italic',
+    padding: SIZES.sm,
+  }
 });

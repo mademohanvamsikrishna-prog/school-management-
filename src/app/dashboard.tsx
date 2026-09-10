@@ -58,6 +58,7 @@ export default function Dashboard() {
         useNativeDriver: true,
       }),
     ]).start();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // =====================================================
@@ -466,7 +467,7 @@ export default function Dashboard() {
           <View style={styles.noticeCard}>
 
             <Text style={styles.noticeTitle}>
-              📋 Today's Tasks
+              📋 Today&apos;s Tasks
             </Text>
 
             <Text style={styles.noticeText}>
@@ -614,6 +615,7 @@ function DashboardCard({
     }, delay);
 
     return () => clearTimeout(timer);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (

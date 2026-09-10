@@ -1,6 +1,6 @@
 import React from 'react';
 import { TouchableOpacity, Text, StyleSheet, ViewStyle } from 'react-native';
-import { COLORS, SIZES, FONTS } from '../constants/theme';
+import { COLORS, SIZES, FONTS, SHADOWS } from '../constants/theme';
 
 interface QuickActionButtonProps {
   title: string;
@@ -34,14 +34,18 @@ const styles = StyleSheet.create({
     padding: SIZES.sm,
     width: 80,
     height: 80,
+    borderWidth: 1,
+    borderColor: 'rgba(226, 232, 240, 0.6)',
+    ...SHADOWS.small,
   },
   icon: {
-    fontSize: 24,
+    fontSize: 26,
     marginBottom: SIZES.sm,
   },
   title: {
     ...FONTS.caption,
-    color: COLORS.text,
+    color: COLORS.textDark,
     textAlign: 'center',
+    fontWeight: '600',
   },
 });

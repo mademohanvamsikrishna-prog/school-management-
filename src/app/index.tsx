@@ -261,6 +261,7 @@ export default function LoginScreen() {
         }),
       ])
     ).start();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // =====================================================
@@ -1251,6 +1252,7 @@ function AnimatedFeature({
     }, 900 + delay);
 
     return () => clearTimeout(timer);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (

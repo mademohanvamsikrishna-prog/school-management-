@@ -15,7 +15,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { storage } from '../utils/storage';
 import { api } from '../services/api';
 import { loginApi, getMeApi, logoutApi } from '../services/auth';
-import { AuthSession, ApiError } from '../services/types';
+import { AuthSession } from '../services/types';
 
 // ---------------------------------------------------------------------------
 // Types

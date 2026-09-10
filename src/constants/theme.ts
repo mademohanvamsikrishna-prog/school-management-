@@ -65,17 +65,19 @@ export const BottomTabInset = Platform.select({ ios: 50, android: 80 }) ?? 0;
 export const MaxContentWidth = 800;
 
 export const COLORS = {
-  primary: '#4F46E5', // Indigo
-  secondary: '#10B981', // Emerald
-  background: '#F3F4F6', // Gray 100
+  primary: '#4F46E5', // Indigo 600
+  secondary: '#312E81', // Indigo 900
+  background: '#F8FAFC', // Slate 50
   card: '#FFFFFF',
-  text: '#1F2937', // Gray 800
-  textSecondary: '#6B7280', // Gray 500
-  border: '#E5E7EB', // Gray 200
-  success: '#10B981',
-  error: '#EF4444',
-  warning: '#F59E0B',
-  info: '#3B82F6',
+  text: '#0F172A', // Slate 900
+  textSecondary: '#64748B', // Slate 500
+  textLight: '#94A3B8', // Slate 400
+  textDark: '#020617', // Slate 950
+  border: '#E2E8F0', // Slate 200
+  success: '#10B981', // Emerald 500
+  error: '#EF4444', // Red 500
+  warning: '#F59E0B', // Amber 500
+  info: '#3B82F6', // Blue 500
   white: '#FFFFFF',
   black: '#000000',
   transparent: 'transparent',
@@ -88,9 +90,9 @@ export const SIZES = {
   lg: 24,
   xl: 32,
   xxl: 40,
-  radius: 12,
+  radius: 16, // Softer curves
   radiusSm: 8,
-  radiusLg: 16,
+  radiusLg: 24,
   radiusRound: 999,
 };
 
@@ -98,26 +100,26 @@ export const SHADOWS = {
   small: {
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 3.84,
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
     elevation: 2,
   },
   medium: {
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 5.46,
-    elevation: 5,
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 4,
   },
 };
 
 export const FONTS = {
-  h1: { fontSize: 32, fontWeight: '700' as const },
-  h2: { fontSize: 24, fontWeight: '700' as const },
+  h1: { fontSize: 32, fontWeight: '800' as const, letterSpacing: -0.5 },
+  h2: { fontSize: 24, fontWeight: '700' as const, letterSpacing: -0.5 },
   h3: { fontSize: 20, fontWeight: '600' as const },
   h4: { fontSize: 18, fontWeight: '600' as const },
-  body1: { fontSize: 16, fontWeight: '400' as const },
-  body2: { fontSize: 14, fontWeight: '400' as const },
-  caption: { fontSize: 12, fontWeight: '400' as const },
+  body1: { fontSize: 16, fontWeight: '400' as const, letterSpacing: 0.1 },
+  body2: { fontSize: 14, fontWeight: '400' as const, letterSpacing: 0.1 },
+  caption: { fontSize: 12, fontWeight: '500' as const, letterSpacing: 0.2 },
 };
 
