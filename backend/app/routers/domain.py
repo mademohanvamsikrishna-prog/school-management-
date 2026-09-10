@@ -22,7 +22,7 @@ GET  /profile/me                           — authenticated
 GET  /dashboard/summary                    — authenticated
 """
 from typing import List, Optional
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.core.dependencies import get_current_user, require_permission
@@ -37,6 +37,65 @@ from app.schemas.domain import (
 )
 
 router = APIRouter()
+
+
+# ===========================================================================
+# Ownership helper
+# ===========================================================================
+
+def _assert_student_access(current_user: User, student_id: str) -> None:
+    """
+    Enforce record-level ownership for student-scoped endpoints.
+
+    Rules
+    -----
+    admin   -> unrestricted (wildcard).
+    student -> may only access their own records.
+    parent  -> may only access records of children linked via parent_students.
+    teacher -> denied (teacher-class-to-student mapping is not implemented;
+               returning 403 is safer than allowing unrestricted access).
+
+    Raises HTTP 403 with a clear message on any violation.
+    """
+    role_name: str = current_user.role.name if current_user.role else ""
+
+    if role_name == "admin":
+        return  # Admin may access all records
+
+    if role_name == "student":
+        if current_user.id != student_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Students may only access their own records.",
+            )
+        return
+
+    if role_name == "parent":
+        child_ids = {child.id for child in current_user.children}
+        if student_id not in child_ids:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Parents may only access records of their linked children.",
+            )
+        return
+
+    if role_name in ("teacher", "staff"):
+        # Teacher-to-student access via class assignment is not implemented.
+        # Return 403 rather than accidentally granting open access.
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=(
+                "Teachers are not permitted to access individual student records "
+                "via this endpoint. Use the class-level analytics endpoints instead."
+            ),
+        )
+
+    # Unknown role — deny by default
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="Access denied.",
+    )
+
 
 # ===========================================================================
 # Attendance
@@ -66,9 +125,10 @@ def mark_attendance(
 )
 def attendance_summary(
     student_id: str,
-    _: User = Depends(require_permission("attendance:read")),
+    current_user: User = Depends(require_permission("attendance:read")),
     db: Session = Depends(get_db),
 ) -> AttendanceSummaryOut:
+    _assert_student_access(current_user, student_id)
     return svc.get_attendance_summary(db, student_id)
 
 
@@ -82,9 +142,10 @@ def attendance_records(
     student_id: str,
     limit: int = Query(30, ge=1, le=100),
     offset: int = Query(0, ge=0),
-    _: User = Depends(require_permission("attendance:read")),
+    current_user: User = Depends(require_permission("attendance:read")),
     db: Session = Depends(get_db),
 ) -> List[AttendanceRecordOut]:
+    _assert_student_access(current_user, student_id)
     return svc.get_attendance_records(db, student_id, limit, offset)
 
 
@@ -114,9 +175,10 @@ def list_exams(
 def student_marks(
     student_id: str,
     exam_id: Optional[str] = Query(None),
-    _: User = Depends(require_permission("marks:read")),
+    current_user: User = Depends(require_permission("marks:read")),
     db: Session = Depends(get_db),
 ) -> List[MarkRecordOut]:
+    _assert_student_access(current_user, student_id)
     return svc.get_student_marks(db, student_id, exam_id)
 
 
@@ -146,7 +208,7 @@ def enter_mark(
 )
 def class_timetable(
     class_id: str,
-    day: Optional[int] = Query(None, ge=1, le=6, description="1=Monday … 6=Saturday"),
+    day: Optional[int] = Query(None, ge=1, le=6, description="1=Monday ... 6=Saturday"),
     _: User = Depends(require_permission("timetable:read")),
     db: Session = Depends(get_db),
 ) -> List[TimetableEntryOut]:
@@ -180,9 +242,10 @@ def teacher_timetable(
 )
 def student_invoices(
     student_id: str,
-    _: User = Depends(require_permission("finance:read")),
+    current_user: User = Depends(require_permission("finance:read")),
     db: Session = Depends(get_db),
 ) -> List[FeeInvoiceOut]:
+    _assert_student_access(current_user, student_id)
     return svc.get_student_invoices(db, student_id)
 
 
@@ -192,7 +255,7 @@ def student_invoices(
     tags=["Finance"],
     summary="[SIMULATED] Record a payment",
     description=(
-        "⚠️ SIMULATED PAYMENT ONLY. No real money is transferred. "
+        "SIMULATED PAYMENT ONLY. No real money is transferred. "
         "This endpoint records a mock payment for development and demo purposes."
     ),
 )
@@ -493,7 +556,7 @@ def update_exam_status(
 
 
 # ===========================================================================
-# Attendance — date range filter + edit
+# Attendance -- date range filter + edit
 # ===========================================================================
 
 @router.get(
@@ -507,9 +570,10 @@ def attendance_history(
     to_date: Optional[str] = Query(None, description="YYYY-MM-DD"),
     limit: int = Query(60, ge=1, le=200),
     offset: int = Query(0, ge=0),
-    _: User = Depends(require_permission("attendance:read")),
+    current_user: User = Depends(require_permission("attendance:read")),
     db: Session = Depends(get_db),
 ) -> list:
+    _assert_student_access(current_user, student_id)
     from app.models.attendance import AttendanceRecord as _AR
     q = db.query(_AR).filter(_AR.student_id == student_id)
     if from_date:

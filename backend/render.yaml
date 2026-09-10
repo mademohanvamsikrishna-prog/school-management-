@@ -1,0 +1,58 @@
+# =============================================================================
+# render.yaml — Render Blueprint for the School Management System backend
+#
+# Usage:
+#   Commit this file. In the Render dashboard, click "New Blueprint" and point
+#   it at this repository. Render will detect render.yaml and pre-fill the
+#   service configuration.
+#
+# After first deploy:
+#   1. Run database migrations via the Render Shell tab:
+#      alembic upgrade head
+#   2. Set CORS_ORIGINS to your Vercel frontend URL once it is known.
+# =============================================================================
+
+services:
+  - type: web
+    name: school-management-api
+    runtime: python
+    # rootDir is relative to the repository root.
+    # Render will run buildCommand and startCommand from this directory.
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    plan: free             # change to "starter" or higher for production SLAs
+    autoDeploy: true       # deploy automatically on push to main
+    healthCheckPath: /health
+
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+
+      - key: DEBUG
+        value: "false"
+
+      # DATABASE_URL is provided by attaching a Render PostgreSQL database.
+      # Set the value in the Render dashboard → Environment tab.
+      # Format: postgresql+psycopg2://user:password@host:5432/dbname
+      - key: DATABASE_URL
+        sync: false
+
+      # Generate a cryptographically random secret.
+      # Render will auto-generate this on first deploy if generateValue is true.
+      - key: JWT_SECRET_KEY
+        generateValue: true
+
+      # Comma-separated list of allowed frontend origins.
+      # Add your Vercel URL here once you know it:
+      #   https://your-app.vercel.app
+      # Multiple origins: "https://a.vercel.app,https://custom-domain.com"
+      - key: CORS_ORIGINS
+        sync: false
+
+      # Optional: tune token lifetimes
+      - key: ACCESS_TOKEN_EXPIRE_MINUTES
+        value: "1440"
+
+      - key: REFRESH_TOKEN_EXPIRE_DAYS
+        value: "7"
