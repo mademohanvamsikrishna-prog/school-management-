@@ -13,6 +13,7 @@ import { useApi } from '../../hooks/useApi';
 import { getDashboardSummary } from '../../services/dashboard';
 import { getEvents } from '../../services/events';
 import { getClassTimetable } from '../../services/timetable';
+import { getTimetableDay } from '../../utils/timetableDay';
 import { getMyProfile } from '../../services/profile';
 
 export default function StudentDashboard() {
@@ -26,13 +27,17 @@ export default function StudentDashboard() {
   // We need the classId to fetch the timetable. Wait until profile is loaded.
   const classId = profile?.student_profile?.class_id;
   
-  // Today's day of week (1=Monday ... 6=Saturday) - mapping JS getDay (0=Sun, 1=Mon) to backend format
+  // Convert JS Date.getDay() (0=Sun … 6=Sat) to the backend format (1=Mon … 6=Sat).
+  // getTimetableDay returns undefined for Sunday — we must not call the API in that case
+  // because the backend only accepts days 1-6 and returns a 422 error for day=7.
   const jsDay = new Date().getDay();
-  const backendDay = jsDay === 0 ? 7 : jsDay; // Though backend only supports 1-6 currently in schema, we'll pass it anyway
+  const backendDay = getTimetableDay(jsDay); // undefined on Sunday
 
   const { data: timetable, loading: timetableLoading } = useApi(
     async () => {
-      if (!classId) return [];
+      // Skip the API call on Sunday or if the class is not yet known.
+      // Returning [] shows the "No classes scheduled for today" empty state.
+      if (!classId || backendDay === undefined) return [];
       return getClassTimetable(classId, backendDay);
     },
     [classId, backendDay]

@@ -96,11 +96,12 @@ def create_application() -> FastAPI:
     # -----------------------------------------------------------------------
     application.add_middleware(
         CORSMiddleware,
-        allow_origins=settings.CORS_ORIGINS,
+        allow_origins=settings.get_cors_origins(),
         allow_credentials=True,
         allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
         allow_headers=["Authorization", "Content-Type", "Accept", "X-Request-ID"],
     )
+
 
     # -----------------------------------------------------------------------
     # Mount API v1 router

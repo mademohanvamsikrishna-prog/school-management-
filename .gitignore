@@ -30,8 +30,11 @@ yarn-error.*
 .DS_Store
 *.pem
 
-# local env files
+# local env files — never commit real values
+.env
+.env.local
 .env*.local
+
 
 # Backend — Python
 backend/.venv/

@@ -35,8 +35,8 @@ export interface AuthContextType {
   token: string | null;
   isLoading: boolean;
   isAuthenticated: boolean;
-  /** Call with email + password. Throws ApiError on failure — caller handles UI errors. */
-  login: (email: string, password: string) => Promise<void>;
+  /** Call with email + password. Returns the authenticated AuthUser. Throws ApiError on failure — caller handles UI errors. */
+  login: (email: string, password: string) => Promise<AuthUser>;
   logout: () => Promise<void>;
   /** True if the current user has the given permission code. */
   hasPermission: (code: string) => boolean;
@@ -128,7 +128,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // login
   // -------------------------------------------------------------------------
 
-  const login = async (email: string, password: string): Promise<void> => {
+  const login = async (email: string, password: string): Promise<AuthUser> => {
     // Throws ApiError on 401/403 — caught in the login screen
     const session = await loginApi({ email, password });
 
@@ -144,6 +144,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(authUser);
     setToken(session.accessToken);
     await _persistSession(session);
+
+    // Return the user so callers can navigate immediately without waiting
+    // for React state to propagate (avoids stale-closure race condition).
+    return authUser;
   };
 
   // -------------------------------------------------------------------------

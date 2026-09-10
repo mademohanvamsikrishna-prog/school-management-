@@ -166,7 +166,8 @@ export default function LoginScreen() {
     setLoading(true);
 
     try {
-      await login(email.trim().toLowerCase(), password);
+      // login() returns the AuthUser synchronously (no state-read race condition).
+      const returnedUser = await login(email.trim().toLowerCase(), password);
 
       // Success animation
       Animated.spring(successScale, {
@@ -176,21 +177,22 @@ export default function LoginScreen() {
         useNativeDriver: true,
       }).start();
 
-      // Navigate based on the role returned from the backend (user.role).
-      // The UI role selector is kept as a visual helper / UX hint only.
-      setTimeout(() => {
-        const serverRole = user?.role;
-        const route = getRoleRoute(serverRole);
+      // Navigate based on the role returned directly from login().
+      // We do NOT read user?.role from React state here because
+      // setState is async and the value may still be null at this point.
+      const route = getRoleRoute(returnedUser.role);
 
-        if (route) {
+      if (route) {
+        // Short delay only for the success animation to be visible, not for state.
+        setTimeout(() => {
           router.replace(route as never);
-        } else {
-          setError(
-            `Unrecognised account role "${serverRole}". Please contact your administrator.`
-          );
-          shakeError();
-        }
-      }, 600);
+        }, 600);
+      } else {
+        setError(
+          `Unrecognised account role "${returnedUser.role}". Please contact your administrator.`
+        );
+        shakeError();
+      }
     } catch (err: unknown) {
       const apiErr = err as ApiError;
       if (apiErr?.statusCode === 403) {
@@ -205,6 +207,7 @@ export default function LoginScreen() {
       setLoading(false);
     }
   };
+
 
   // =====================================================
   // BUTTON / EYE / REMEMBER PRESS

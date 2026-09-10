@@ -1,13 +1,13 @@
 import os
 from typing import List, Union
-from pydantic import AnyHttpUrl, field_validator
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
     APP_NAME: str = "School Management System API"
     APP_VERSION: str = "1.0.0"
-    ENVIRONMENT: str = "development"  # "development", "testing", "production"
+    ENVIRONMENT: str = "development"  # "development" | "testing" | "production"
     DEBUG: bool = True
 
     # Security
@@ -22,15 +22,20 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "sqlite:///./school.db"
 
     # CORS
-    CORS_ORIGINS: List[str] = [
-        "http://localhost:8081",
-        "http://localhost:19006",
-        "http://localhost:3000",
-        "http://localhost:8000",
-        "http://127.0.0.1:8081",
-        "http://127.0.0.1:8000",
-        "*",
-    ]
+    # In development the field defaults to localhost ports.
+    # In production, set CORS_ORIGINS as a comma-separated string of allowed origins
+    # in the Render environment dashboard, e.g.:
+    #   CORS_ORIGINS=https://yourapp.vercel.app,https://yourapp.com
+    #
+    # DO NOT use "*" — it is incompatible with allow_credentials=True (CORS spec).
+    CORS_ORIGINS: Union[str, List[str]] = (
+        "http://localhost:8081,"
+        "http://localhost:19006,"
+        "http://localhost:3000,"
+        "http://localhost:8000,"
+        "http://127.0.0.1:8081,"
+        "http://127.0.0.1:8000"
+    )
 
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -39,10 +44,63 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
+    @field_validator("CORS_ORIGINS", mode="before")
+    @classmethod
+    def parse_cors_origins(cls, v: Union[str, List[str]]) -> List[str]:
+        """
+        Accept CORS_ORIGINS as:
+          - A comma-separated string: "https://a.com,https://b.com"
+          - A Python list (when set programmatically in tests)
+
+        Strips whitespace and filters empty entries.
+        Never allows "*" — wildcard + credentials violates the CORS spec and
+        is rejected by all modern browsers.
+        """
+        if isinstance(v, list):
+            origins = v
+        else:
+            origins = [o.strip() for o in v.split(",") if o.strip()]
+
+        for origin in origins:
+            if origin == "*":
+                raise ValueError(
+                    "Wildcard '*' is not permitted in CORS_ORIGINS when "
+                    "allow_credentials=True. Specify explicit origins instead."
+                )
+        return origins
+
+    def get_cors_origins(self) -> List[str]:
+        """
+        Return the parsed CORS origins list.
+        In production, only explicitly configured origins are returned.
+        In development/testing, localhost entries are always included for convenience.
+        """
+        origins: List[str] = (
+            self.CORS_ORIGINS
+            if isinstance(self.CORS_ORIGINS, list)
+            else [o.strip() for o in self.CORS_ORIGINS.split(",") if o.strip()]
+        )
+
+        is_prod = self.ENVIRONMENT.lower() in ("production", "prod")
+        if not is_prod:
+            # Ensure local dev origins are always present in non-production
+            local_origins = [
+                "http://localhost:8081",
+                "http://localhost:19006",
+                "http://localhost:3000",
+                "http://localhost:8000",
+                "http://127.0.0.1:8081",
+                "http://127.0.0.1:8000",
+            ]
+            for lo in local_origins:
+                if lo not in origins:
+                    origins.append(lo)
+
+        return origins
+
     @field_validator("DATABASE_URL")
     @classmethod
-    def validate_database_url(cls, v: str, info) -> str:
-        # Check environment from data if available or os.environ
+    def validate_database_url(cls, v: str) -> str:
         return v
 
     def enforce_production_database(self) -> None:
