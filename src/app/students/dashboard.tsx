@@ -1,5 +1,5 @@
 import React from 'react';
-import { ScrollView, View, StyleSheet, SafeAreaView } from 'react-native';
+import { ScrollView, View, StyleSheet, SafeAreaView, ActivityIndicator, Text } from 'react-native';
 import { useRouter } from 'expo-router';
 import { AppHeader } from '../../components/AppHeader';
 import { DashboardSection } from '../../components/DashboardSection';
@@ -7,58 +7,102 @@ import { StatCard } from '../../components/StatCard';
 import { EventCard } from '../../components/EventCard';
 import { QuickActionButton } from '../../components/QuickActionButton';
 import { COLORS, SIZES } from '../../constants/theme';
-import { students, mockAttendanceSummary, mockTimetable, mockEvents } from '../../mock';
+import { useAuth } from '../../context/AuthContext';
+import { useApi } from '../../hooks/useApi';
+import { getDashboardSummary } from '../../services/dashboard';
+import { getEvents } from '../../services/events';
+import { getClassTimetable } from '../../services/timetable';
+import { getMyProfile } from '../../services/profile';
 
 export default function StudentDashboard() {
   const router = useRouter();
-  const student = students[0];
-  const attendance = mockAttendanceSummary[student.id];
+  const { user } = useAuth();
+  
+  const { data: summary, loading: summaryLoading } = useApi(getDashboardSummary);
+  const { data: events, loading: eventsLoading } = useApi(() => getEvents(true));
+  const { data: profile } = useApi(getMyProfile);
+
+  // We need the classId to fetch the timetable. Wait until profile is loaded.
+  const classId = profile?.student_profile?.class_id;
+  
+  // Today's day of week (1=Monday ... 6=Saturday) - mapping JS getDay (0=Sun, 1=Mon) to backend format
+  const jsDay = new Date().getDay();
+  const backendDay = jsDay === 0 ? 7 : jsDay; // Though backend only supports 1-6 currently in schema, we'll pass it anyway
+
+  const { data: timetable, loading: timetableLoading } = useApi(
+    async () => {
+      if (!classId) return [];
+      return getClassTimetable(classId, backendDay);
+    },
+    [classId, backendDay]
+  );
+
+  const isLoading = summaryLoading || eventsLoading || timetableLoading;
+
+  if (isLoading || !summary || !user) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.centerContainer}>
+          <ActivityIndicator size="large" color={COLORS.primary} />
+          <Text style={styles.loadingText}>Loading Dashboard...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.safeArea}>
       <AppHeader
-        title={`Good Morning, ${student.name.split(' ')[0]}`}
-        subtitle={student.className}
-        avatarUrl={student.avatarUrl}
+        title={`Good Morning, ${user.name.split(' ')[0]}`}
+        subtitle={profile?.student_profile?.class_name || 'Loading...'}
+        avatarUrl={user.avatarUrl}
       />
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.container}>
         
         {/* Attendance */}
         <DashboardSection title="Attendance" actionText="View Details" onAction={() => router.push('/students/academics')}>
           <View style={styles.row}>
-            <StatCard title="Overall" value={`${attendance?.percentage || 0}%`} icon="📊" style={styles.flex1} />
-            <StatCard title="Present" value={attendance?.presentDays || 0} icon="✅" color={COLORS.success} style={styles.flex1} />
-            <StatCard title="Absent" value={attendance?.absentDays || 0} icon="❌" color={COLORS.error} style={styles.flex1} />
+            <StatCard title="Overall" value={`${summary.attendance_percentage || 0}%`} icon="📊" style={styles.flex1} />
+            <StatCard title="Present" value={summary.present_days || 0} icon="✅" color={COLORS.success} style={styles.flex1} />
+            <StatCard title="Absent" value={summary.absent_days || 0} icon="❌" color={COLORS.error} style={styles.flex1} />
           </View>
         </DashboardSection>
 
         {/* Timetable */}
         <DashboardSection title="Today's Timetable">
-          {mockTimetable.slice(0, 2).map((entry) => (
-            <View key={entry.id} style={styles.timetableItem}>
-              <View style={styles.timeBlock}>
-                <StatCard title={entry.startTime} value={entry.subjectName} subtitle={`Room: ${entry.roomNumber}`} style={{flex: 1}} />
+          {timetable && timetable.length > 0 ? (
+            timetable.slice(0, 2).map((entry) => (
+              <View key={entry.id} style={styles.timetableItem}>
+                <View style={styles.timeBlock}>
+                  <StatCard title={`${entry.start_time} - ${entry.end_time}`} value={entry.subject_name || 'Unknown'} subtitle={`Room: ${entry.room_number}`} style={{flex: 1}} />
+                </View>
               </View>
-            </View>
-          ))}
+            ))
+          ) : (
+            <Text style={styles.emptyText}>No classes scheduled for today.</Text>
+          )}
         </DashboardSection>
 
         {/* Quick Actions */}
         <DashboardSection title="Quick Actions">
           <View style={styles.quickActions}>
             <QuickActionButton title="Attendance" icon="📅" onPress={() => router.push('/students/academics')} />
-            <QuickActionButton title="Timetable" icon="🕒" onPress={() => {}} />
-            <QuickActionButton title="Marks" icon="📝" onPress={() => {}} />
-            <QuickActionButton title="Exams" icon="📜" onPress={() => {}} />
+            <QuickActionButton title="Marks" icon="📝" onPress={() => router.push('/students/academics')} />
+            <QuickActionButton title="Events" icon="🎉" onPress={() => router.push('/students/events')} />
+            <QuickActionButton title="Profile" icon="👤" onPress={() => router.push('/students/profile')} />
           </View>
         </DashboardSection>
 
         {/* Events */}
         <DashboardSection title="Upcoming Events" actionText="View All" onAction={() => router.push('/students/events')}>
           <View style={{ gap: SIZES.md }}>
-            {mockEvents.map((event) => (
-              <EventCard key={event.id} {...event} />
-            ))}
+            {events && events.length > 0 ? (
+              events.slice(0, 3).map((event) => (
+                <EventCard key={event.id} {...event} />
+              ))
+            ) : (
+               <Text style={styles.emptyText}>No upcoming events.</Text>
+            )}
           </View>
         </DashboardSection>
 
@@ -74,6 +118,15 @@ const styles = StyleSheet.create({
   },
   container: {
     paddingVertical: SIZES.md,
+  },
+  centerContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: SIZES.sm,
+    color: COLORS.textLight,
   },
   row: {
     flexDirection: 'row',
@@ -94,4 +147,9 @@ const styles = StyleSheet.create({
     gap: SIZES.md,
     justifyContent: 'space-between',
   },
+  emptyText: {
+    color: COLORS.textLight,
+    fontStyle: 'italic',
+    padding: SIZES.sm,
+  }
 });

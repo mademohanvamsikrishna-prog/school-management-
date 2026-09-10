@@ -49,6 +49,10 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.card,
     borderRadius: SIZES.radius,
     padding: SIZES.md,
+    borderWidth: 1,
+    borderColor: 'rgba(226, 232, 240, 0.6)',
+    borderLeftWidth: 4,
+    borderLeftColor: COLORS.primary,
     ...SHADOWS.small,
   },
   header: {

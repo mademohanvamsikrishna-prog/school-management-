@@ -27,6 +27,15 @@ from app.models.communication import (
 )
 from app.models.finance import FeeCategory, FeeInvoice, PaymentRecord
 from app.models.refresh_token import RefreshToken
+# Extended modules (P13–P20)
+from app.models.foodcourt import FoodCategory, FoodItem, FoodOrder, FoodOrderItem
+from app.models.transport import Vehicle, TransportRoute, RouteStop, StudentTransportAssignment
+from app.models.library import BookCategory, Book, BookCopy, BookIssue
+from app.models.leave import LeaveType, LeaveRequest, StaffTimesheet
+from app.models.files import FileRecord
+from app.models.hostel import Hostel, HostelRoom, HostelBed, BedAllocation
+from app.models.inventory import Supplier, InventoryCategory, InventoryItem, StockMovement
+from app.models.hr import Department, StaffPerformanceRecord
 
 
 __all__ = [

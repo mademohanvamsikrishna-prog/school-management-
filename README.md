@@ -1,56 +1,149 @@
-# Welcome to your Expo app 👋
+# School Management System
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+A full-stack school management system built with React Native (Expo) and FastAPI.
 
-## Get started
+## Architecture
 
-1. Install dependencies
-
-   ```bash
-   npm install
-   ```
-
-2. Start the app
-
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
-
-```bash
-npm run reset-project
+```
+Frontend (React Native/Expo/TypeScript)
+    ↓ HTTPS
+FastAPI REST API
+    ↓ Authorization (JWT + RBAC)
+Service Layer
+    ↓ Business Logic
+Repository Layer
+    ↓ SQLAlchemy ORM
+PostgreSQL (Production) / SQLite (Development)
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+## Features
 
-### Other setup steps
+| Module | Status | Notes |
+|--------|--------|-------|
+| Authentication (JWT + Refresh) | ✅ | Access + refresh tokens, bcrypt hashing |
+| RBAC (User → Role → Permissions) | ✅ | 27 granular permissions |
+| User Management | ✅ | Admin CRUD, activation/deactivation |
+| Classes + Subjects | ✅ | CRUD, enrollment management |
+| Timetable | ✅ | CRUD + teacher/class conflict detection |
+| Attendance | ✅ | Mark, history, date-range filter, summaries |
+| Marks + Exams | ✅ | Exam CRUD, mark entry, auto grade calculation |
+| Events + Notifications | ✅ | CRUD, mark-as-read |
+| Chat (REST) | ✅ | Conversations + message history (polling) |
+| Finance | ✅ | Invoices, payments (explicitly simulated/sandbox) |
+| Dashboards | ✅ | Role-aware: Admin, Teacher, Student, Parent |
+| Analytics | ✅ | Enrollment, attendance, finance overview |
+| Food Court | ✅ | Menu, cart, orders, order tracking |
+| Transport | ✅ | Routes, stops, student assignments |
+| Library | ✅ | Books, issue/return, fine calculation |
+| Leave Management | ✅ | Types, apply, approve/reject workflow |
+| Hostel | ✅ | Rooms, beds, student allocations |
+| Inventory | ✅ | Items, stock movements, low-stock alerts |
+| HR + Performance | ✅ | Departments, performance reviews |
+| File Management | ✅ | Metadata layer (local filesystem storage) |
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+## Quick Start
 
-## Learn more
+### Prerequisites
+- Node.js 18+, npm
+- Python 3.11+
+- PostgreSQL (production) or SQLite (development)
 
-To learn more about developing your project with Expo, look at the following resources:
+### Frontend
+```bash
+npm install
+npm run dev
+```
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+### Backend
+```bash
+cd backend
+python -m venv .venv
+# Windows:
+.venv\Scripts\activate
+# macOS/Linux:
+source .venv/bin/activate
 
-## Join the community
+pip install -r requirements.txt
 
-Join our community of developers creating universal apps.
+# Copy environment template
+cp .env.example .env
+# Edit .env with your settings
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+# Run migrations
+alembic upgrade head
+
+# Start server
+uvicorn app.main:app --reload
+```
+
+### Environment Variables (backend/.env)
+```env
+DATABASE_URL=postgresql://user:password@localhost:5432/school_db
+JWT_SECRET_KEY=your-very-secure-secret-key-change-in-production
+ENVIRONMENT=development
+```
+
+> **Production** requires `DATABASE_URL` to start with `postgresql://`. The server will refuse to start with SQLite in production.
+
+## API Documentation
+
+When running with `DEBUG=true`, Swagger UI is available at:
+- `http://localhost:8000/docs`
+- `http://localhost:8000/redoc`
+
+Full API reference: [docs/API.md](docs/API.md)
+
+## Testing
+
+### Backend
+```bash
+cd backend
+pytest tests/ -v
+```
+
+### Frontend TypeScript
+```bash
+npx tsc --noEmit
+```
+
+## Authentication
+
+All API endpoints (except `/health` and `POST /api/v1/auth/login`) require a Bearer token:
+
+```http
+Authorization: Bearer <access_token>
+```
+
+Obtain tokens via `POST /api/v1/auth/login`. Refresh tokens via `POST /api/v1/auth/refresh`.
+
+## RBAC
+
+| Role | Description |
+|------|-------------|
+| admin | Full access (wildcard bypass) |
+| teacher | Teaching operations (marks, attendance, timetable) |
+| student | Read-only student data |
+| parent | Read-only parent/child data |
+
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full permissions matrix.
+
+## Production Deployment
+
+> See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for deployment checklist.
+
+Key requirements:
+1. `ENVIRONMENT=production` → PostgreSQL enforced
+2. Strong `JWT_SECRET_KEY` (min 32 chars, randomly generated)
+3. HTTPS termination at load balancer
+4. Reverse proxy (nginx/caddy) in front of uvicorn
+
+## Limitations & Honest Notes
+
+- **Payments**: All payment processing is **SANDBOX/SIMULATED**. No real money is transferred. `payment_method` is explicitly set to `simulated_sandbox`.
+- **Chat**: REST polling-based. Not real-time WebSocket push (requires Redis/message broker).
+- **File Storage**: Local filesystem only. For production, configure an S3-compatible bucket and update `FileRecord.storage_path` accordingly.
+- **Transport**: Route management only. No live GPS tracking.
+
+## License
+
+MIT

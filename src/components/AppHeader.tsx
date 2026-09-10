@@ -1,12 +1,14 @@
 import React from 'react';
-import { View, Text, StyleSheet, ViewStyle, Image } from 'react-native';
-import { COLORS, SIZES, FONTS } from '../constants/theme';
+import { View, Text, StyleSheet, ViewStyle, Image, TouchableOpacity } from 'react-native';
+import { useRouter } from 'expo-router';
+import { COLORS, SIZES, FONTS, SHADOWS } from '../constants/theme';
 
 interface AppHeaderProps {
   title: string;
   subtitle?: string;
   avatarUrl?: string;
   style?: ViewStyle;
+  showBack?: boolean;
 }
 
 export const AppHeader: React.FC<AppHeaderProps> = ({
@@ -14,12 +16,22 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   subtitle,
   avatarUrl,
   style,
+  showBack,
 }) => {
+  const router = useRouter();
+
   return (
     <View style={[styles.container, style]}>
-      <View style={styles.textContainer}>
-        <Text style={styles.title}>{title}</Text>
-        {subtitle && <Text style={styles.subtitle}>{subtitle}</Text>}
+      <View style={styles.content}>
+        {showBack && (
+          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+            <Text style={styles.backIcon}>←</Text>
+          </TouchableOpacity>
+        )}
+        <View style={styles.textContainer}>
+          <Text style={styles.title}>{title}</Text>
+          {subtitle && <Text style={styles.subtitle}>{subtitle}</Text>}
+        </View>
       </View>
       <View style={styles.rightContainer}>
         <View style={styles.notification}>
@@ -39,16 +51,32 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: SIZES.md,
+    paddingHorizontal: SIZES.lg,
     paddingVertical: SIZES.md,
-    backgroundColor: COLORS.background,
+    backgroundColor: COLORS.card,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(226, 232, 240, 0.8)',
+    ...SHADOWS.small,
+  },
+  content: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  backButton: {
+    marginRight: SIZES.sm,
+    padding: 4,
+  },
+  backIcon: {
+    fontSize: 24,
+    color: COLORS.textDark,
   },
   textContainer: {
     flex: 1,
   },
   title: {
     ...FONTS.h3,
-    color: COLORS.text,
+    color: COLORS.textDark,
   },
   subtitle: {
     ...FONTS.body2,
@@ -61,14 +89,20 @@ const styles = StyleSheet.create({
     gap: SIZES.md,
   },
   avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: COLORS.border,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: COLORS.background,
+    borderWidth: 2,
+    borderColor: COLORS.primary,
   },
   notification: {
     position: 'relative',
     padding: 8,
+    backgroundColor: COLORS.background,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(226, 232, 240, 0.6)',
   },
   bell: {
     fontSize: 20,
@@ -77,9 +111,11 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 6,
     right: 8,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
     backgroundColor: COLORS.error,
+    borderWidth: 1.5,
+    borderColor: COLORS.card,
   },
 });

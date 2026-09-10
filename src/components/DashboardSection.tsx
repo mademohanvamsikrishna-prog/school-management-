@@ -34,7 +34,7 @@ export const DashboardSection: React.FC<DashboardSectionProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    marginBottom: SIZES.lg,
+    marginBottom: SIZES.xl,
   },
   header: {
     flexDirection: 'row',
@@ -44,13 +44,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: SIZES.md,
   },
   title: {
-    ...FONTS.h4,
-    color: COLORS.text,
+    ...FONTS.h3,
+    color: COLORS.textDark,
   },
   actionText: {
     ...FONTS.body2,
     color: COLORS.primary,
-    fontWeight: '500',
+    fontWeight: '600',
   },
   content: {
     paddingHorizontal: SIZES.md,

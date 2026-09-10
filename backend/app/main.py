@@ -33,9 +33,17 @@ from app.core.config import settings
 # ---------------------------------------------------------------------------
 from fastapi import APIRouter
 from app.routers import auth as auth_router
+from app.routers import domain as domain_router
+from app.routers import admin as admin_router
+from app.routers import chat as chat_router
+from app.routers import extended as extended_router
 
 api_v1_router = APIRouter(prefix="/api/v1")
 api_v1_router.include_router(auth_router.router)
+api_v1_router.include_router(domain_router.router)
+api_v1_router.include_router(admin_router.router)
+api_v1_router.include_router(chat_router.router)
+api_v1_router.include_router(extended_router.router)
 
 # ---------------------------------------------------------------------------
 # Startup / shutdown lifecycle
