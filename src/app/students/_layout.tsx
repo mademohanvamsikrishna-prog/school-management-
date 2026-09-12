@@ -24,6 +24,7 @@ export default function StudentLayout() {
               paddingTop: 8,
             },
       }}>
+      {/* ── Visible tab-bar screens (mobile only) ── */}
       <Tabs.Screen
         name="dashboard"
         options={{
@@ -34,29 +35,29 @@ export default function StudentLayout() {
         }}
       />
       <Tabs.Screen
-        name="academics"
+        name="attendance"
         options={{
-          title: 'Academics',
+          title: 'Attendance',
           tabBarIcon: ({ focused }) => (
-            <Text style={{ fontSize: 20, opacity: focused ? 1 : 0.6 }}>📚</Text>
+            <Text style={{ fontSize: 20, opacity: focused ? 1 : 0.6 }}>📊</Text>
           ),
         }}
       />
       <Tabs.Screen
-        name="events"
+        name="exams"
         options={{
-          title: 'Events',
+          title: 'Exams',
           tabBarIcon: ({ focused }) => (
-            <Text style={{ fontSize: 20, opacity: focused ? 1 : 0.6 }}>📅</Text>
+            <Text style={{ fontSize: 20, opacity: focused ? 1 : 0.6 }}>✍️</Text>
           ),
         }}
       />
       <Tabs.Screen
-        name="chat"
+        name="fees"
         options={{
-          title: 'Chat',
+          title: 'Fees',
           tabBarIcon: ({ focused }) => (
-            <Text style={{ fontSize: 20, opacity: focused ? 1 : 0.6 }}>💬</Text>
+            <Text style={{ fontSize: 20, opacity: focused ? 1 : 0.6 }}>💳</Text>
           ),
         }}
       />
@@ -69,8 +70,25 @@ export default function StudentLayout() {
           ),
         }}
       />
-      <Tabs.Screen name="index" options={{ href: null }} />
-      <Tabs.Screen name="add"   options={{ href: null }} />
+
+      {/* ── Hidden from tab bar — accessible via sidebar / links ── */}
+      <Tabs.Screen name="index"          options={{ href: null }} />
+      <Tabs.Screen name="add"            options={{ href: null }} />
+      <Tabs.Screen name="academics"      options={{ href: null }} />
+      <Tabs.Screen name="events"         options={{ href: null }} />
+      <Tabs.Screen name="chat"           options={{ href: null }} />
+      <Tabs.Screen name="library"        options={{ href: null }} />
+      <Tabs.Screen name="transport"      options={{ href: null }} />
+      <Tabs.Screen name="foodcourt"      options={{ href: null }} />
+      <Tabs.Screen name="timetable"      options={{ href: null }} />
+      <Tabs.Screen name="homework"       options={{ href: null }} />
+      <Tabs.Screen name="assignments"    options={{ href: null }} />
+      <Tabs.Screen name="study-materials" options={{ href: null }} />
+      <Tabs.Screen name="online-classes" options={{ href: null }} />
+      <Tabs.Screen name="results"        options={{ href: null }} />
+      <Tabs.Screen name="notifications"  options={{ href: null }} />
+      <Tabs.Screen name="leave"          options={{ href: null }} />
+      <Tabs.Screen name="certificates"   options={{ href: null }} />
     </Tabs>
   );
 
