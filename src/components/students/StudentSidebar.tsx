@@ -1,11 +1,11 @@
 /**
  * StudentSidebar — left navigation panel rendered ONLY on web/desktop.
  *
- * Pure UI component. Uses existing router.push() calls — no new routes created.
- * All nav targets are existing pages in the student section.
+ * Pure UI component. Uses existing router.push() calls.
+ * Expanded to the full 17-item student navigation.
  */
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
 import { useRouter, usePathname } from 'expo-router';
 import { COLORS, SIZES, FONTS, SHADOWS } from '../../constants/theme';
 
@@ -13,23 +13,34 @@ interface NavItem {
   label: string;
   icon: string;
   route: string;
-  /** The pathname segment used to detect the active state (e.g. 'dashboard', 'academics'). */
   segment: string;
   badge?: string;
 }
 
 const PRIMARY_NAV: NavItem[] = [
-  { label: 'Dashboard',  icon: '⊞',  route: '/students/dashboard', segment: 'dashboard'  },
-  { label: 'Academics',  icon: '📚', route: '/students/academics',  segment: 'academics'  },
-  { label: 'Attendance', icon: '📊', route: '/students/academics',  segment: 'attendance' },
-  { label: 'Results',    icon: '🏆', route: '/students/academics',  segment: 'results'    },
-  { label: 'Events',     icon: '📅', route: '/students/events',     segment: 'events'     },
-  { label: 'Messages',   icon: '💬', route: '/students/chat',       segment: 'chat'       },
+  { label: 'Dashboard',       icon: '⊞',  route: '/students/dashboard',       segment: 'dashboard'       },
+  { label: 'Profile',         icon: '👤', route: '/students/profile',          segment: 'profile'         },
+  { label: 'Attendance',      icon: '📊', route: '/students/attendance',       segment: 'attendance'      },
+  { label: 'Timetable',       icon: '🗓️', route: '/students/timetable',        segment: 'timetable'       },
+  { label: 'Homework',        icon: '📝', route: '/students/homework',         segment: 'homework'        },
+  { label: 'Assignments',     icon: '📋', route: '/students/assignments',      segment: 'assignments'     },
+  { label: 'Study Materials', icon: '📂', route: '/students/study-materials',  segment: 'study-materials' },
+  { label: 'Online Classes',  icon: '🎥', route: '/students/online-classes',   segment: 'online-classes'  },
+  { label: 'Exams',           icon: '✍️', route: '/students/exams',            segment: 'exams'           },
+  { label: 'Results',         icon: '🏆', route: '/students/results',          segment: 'results'         },
+  { label: 'Report Cards',    icon: '📄', route: '/students/results',          segment: 'report'          },
+  { label: 'Fees',            icon: '💳', route: '/students/fees',             segment: 'fees'            },
+  { label: 'Library',         icon: '📚', route: '/students/library',          segment: 'library'         },
+  { label: 'Transport',       icon: '🚌', route: '/students/transport',        segment: 'transport'       },
+  { label: 'Notifications',   icon: '🔔', route: '/students/notifications',    segment: 'notifications'   },
+  { label: 'Leave Requests',  icon: '🗂️', route: '/students/leave',            segment: 'leave'           },
+  { label: 'Certificates',    icon: '🎖️', route: '/students/certificates',     segment: 'certificates'    },
 ];
 
 const SECONDARY_NAV: NavItem[] = [
-  { label: 'Settings', icon: '⚙️', route: '/students/profile', segment: 'profile' },
-  { label: 'Help',     icon: '❓', route: '/students/profile', segment: 'help'    },
+  { label: 'Events',    icon: '📅', route: '/students/events',   segment: 'events'   },
+  { label: 'Messages',  icon: '💬', route: '/students/chat',     segment: 'chat'     },
+  { label: 'Settings',  icon: '⚙️', route: '/students/profile',  segment: 'settings' },
 ];
 
 interface StudentSidebarProps {
@@ -41,15 +52,8 @@ export const StudentSidebar: React.FC<StudentSidebarProps> = () => {
   const router = useRouter();
   const pathname = usePathname();
 
-  /**
-   * A nav item is highlighted when the current pathname ends with its route segment.
-   * e.g. /students/academics → segment 'academics' → highlighted.
-   * Attendance and Results both live on /students/academics so they share the highlight.
-   */
   const isHighlighted = (item: NavItem): boolean => {
-    // exact match covers dashboard
     if (pathname === item.route) return true;
-    // segment match: /students/academics → ends with 'academics'
     return pathname.endsWith(item.segment);
   };
 
@@ -88,36 +92,20 @@ export const StudentSidebar: React.FC<StudentSidebarProps> = () => {
       {/* Divider */}
       <View style={styles.divider} />
 
-      {/* Primary navigation */}
-      <View style={styles.navGroup}>
+      {/* Primary navigation — scrollable */}
+      <ScrollView
+        style={{ flex: 1 }}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.navGroup}
+      >
         {PRIMARY_NAV.map(renderNavItem)}
-      </View>
 
-      {/* Spacer */}
-      <View style={{ flex: 1 }} />
-
-      {/* Divider */}
-      <View style={styles.divider} />
-
-      {/* Secondary navigation (Settings + Help) */}
-      <View style={[styles.navGroup, { marginBottom: SIZES.md }]}>
-        {SECONDARY_NAV.map((item) => {
-          const highlighted = isHighlighted(item);
-          return (
-            <TouchableOpacity
-              key={item.label}
-              style={[styles.navItem, highlighted && styles.navItemActive]}
-              onPress={() => router.push(item.route as any)}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.navIcon}>{item.icon}</Text>
-              <Text style={[styles.navLabel, highlighted && styles.navLabelActive]}>
-                {item.label}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
+        {/* Secondary nav section */}
+        <View style={styles.divider} />
+        <Text style={styles.sectionLabel}>MORE</Text>
+        {SECONDARY_NAV.map(renderNavItem)}
+        <View style={{ height: SIZES.md }} />
+      </ScrollView>
     </View>
   );
 };
@@ -132,6 +120,7 @@ const styles = StyleSheet.create({
     paddingBottom: SIZES.md,
     ...SHADOWS.small,
     zIndex: 10,
+    flexDirection: 'column',
   },
   brand: {
     flexDirection: 'row',
@@ -168,7 +157,15 @@ const styles = StyleSheet.create({
   navGroup: {
     paddingHorizontal: SIZES.sm,
     gap: 2,
-    marginTop: SIZES.xs,
+    paddingTop: SIZES.xs,
+  },
+  sectionLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: COLORS.textLight,
+    letterSpacing: 1.2,
+    paddingHorizontal: SIZES.md,
+    paddingVertical: SIZES.xs,
   },
   navItem: {
     flexDirection: 'row',
