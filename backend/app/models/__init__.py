@@ -36,6 +36,8 @@ from app.models.files import FileRecord
 from app.models.hostel import Hostel, HostelRoom, HostelBed, BedAllocation
 from app.models.inventory import Supplier, InventoryCategory, InventoryItem, StockMovement
 from app.models.hr import Department, StaffPerformanceRecord
+# Student Dashboard CRUD modules
+from app.models.dashboard_modules import StudentAssignment, Notice, StudentLeave
 
 
 __all__ = [
@@ -66,5 +68,9 @@ __all__ = [
     "FeeInvoice",
     "PaymentRecord",
     "RefreshToken",
+    # Student Dashboard CRUD
+    "StudentAssignment",
+    "Notice",
+    "StudentLeave",
 ]
 
