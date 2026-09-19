@@ -28,7 +28,6 @@ const PRIMARY_NAV: NavItem[] = [
   { label: 'Online Classes',  icon: '🎥', route: '/students/online-classes',   segment: 'online-classes'  },
   { label: 'Exams',           icon: '✍️', route: '/students/exams',            segment: 'exams'           },
   { label: 'Results',         icon: '🏆', route: '/students/results',          segment: 'results'         },
-  { label: 'Report Cards',    icon: '📄', route: '/students/results',          segment: 'report'          },
   { label: 'Fees',            icon: '💳', route: '/students/fees',             segment: 'fees'            },
   { label: 'Library',         icon: '📚', route: '/students/library',          segment: 'library'         },
   { label: 'Transport',       icon: '🚌', route: '/students/transport',        segment: 'transport'       },
