@@ -34,7 +34,9 @@ class Settings(BaseSettings):
         "http://localhost:3000,"
         "http://localhost:8000,"
         "http://127.0.0.1:8081,"
-        "http://127.0.0.1:8000"
+        "http://127.0.0.1:8000,"
+        "https://school-management-smoky-six.vercel.app,"
+        "https://school-management-git-main-mademohanvamsikrishna-8090.vercel.app"
     )
 
     model_config = SettingsConfigDict(
@@ -82,6 +84,15 @@ class Settings(BaseSettings):
         )
 
         is_prod = self.ENVIRONMENT.lower() in ("production", "prod")
+        # Always ensure Vercel production origins are present
+        vercel_origins = [
+            "https://school-management-smoky-six.vercel.app",
+            "https://school-management-git-main-mademohanvamsikrishna-8090.vercel.app",
+        ]
+        for vo in vercel_origins:
+            if vo not in origins:
+                origins.append(vo)
+
         if not is_prod:
             # Ensure local dev origins are always present in non-production
             local_origins = [

@@ -5,18 +5,17 @@ import { Platform } from 'react-native';
  *
  * API_BASE_URL resolution priority:
  *  1. EXPO_PUBLIC_API_BASE_URL  — set in Vercel / CI environment at build time.
- *     Example: https://school-api.onrender.com/api/v1
- *  2. Platform-specific localhost fallback — local development only.
- *     This value is NEVER reached in a Vercel/Render production build because
- *     EXPO_PUBLIC_API_BASE_URL will always be set there.
+ *     Example: https://school-management-production-1d29.up.railway.app/api/v1
+ *  2. Railway production fallback — used when the env var is not set.
+ *     Defaults to: https://school-management-production-1d29.up.railway.app/api/v1
  *
- * To test locally against a different backend, create a .env.local file:
+ * To test locally against a local backend, create a .env.local file:
  *   EXPO_PUBLIC_API_BASE_URL=http://localhost:8000/api/v1
  */
 const _localFallback = Platform.select({
-  web:     'http://localhost:8000/api/v1',
-  android: 'http://10.0.2.2:8000/api/v1',
-  default: 'http://localhost:8000/api/v1',
+  web:     'https://school-management-production-1d29.up.railway.app/api/v1',
+  android: 'https://school-management-production-1d29.up.railway.app/api/v1',
+  default: 'https://school-management-production-1d29.up.railway.app/api/v1',
 }) as string;
 
 export const ENV = {
