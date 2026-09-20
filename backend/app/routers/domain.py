@@ -114,6 +114,32 @@ def mark_attendance(
     db: Session = Depends(get_db),
 ) -> dict:
     count = svc.mark_attendance(db, payload, teacher_id=teacher.id)
+
+    # ── Notification dispatch: notify student + parents on absent/late ──────
+    from app.models.communication import Notification as _Notif
+    for entry in payload.records:
+        if entry.status not in ("absent", "late"):
+            continue
+        student = db.query(User).filter(User.id == entry.student_id).first()
+        if not student:
+            continue
+        label = "marked absent" if entry.status == "absent" else "marked late"
+        # Notify the student themselves
+        db.add(_Notif(
+            user_id=student.id,
+            title=f"Attendance Update — {payload.date}",
+            body=f"You were {label} on {payload.date}. Please check with your teacher.",
+            type="attendance",
+        ))
+        # Notify each linked parent
+        for parent in student.parents:
+            db.add(_Notif(
+                user_id=parent.id,
+                title=f"Attendance Alert: {student.name}",
+                body=f"{student.name} was {label} on {payload.date}. Please follow up with the school.",
+                type="attendance",
+            ))
+    db.commit()
     return {"marked": count, "date": payload.date}
 
 
@@ -193,7 +219,39 @@ def enter_mark(
     teacher: User = Depends(require_permission("marks:write")),
     db: Session = Depends(get_db),
 ) -> MarkRecordOut:
-    return svc.enter_mark(db, payload, teacher_id=teacher.id)
+    result = svc.enter_mark(db, payload, teacher_id=teacher.id)
+
+    # ── Notification dispatch: notify student + parents of new/updated mark ─
+    from app.models.communication import Notification as _Notif
+    from app.models.marks import ExamSubject as _ES, Exam as _EX
+    student = db.query(User).filter(User.id == payload.student_id).first()
+    if student:
+        # Resolve subject/exam name for a friendly message
+        es = db.query(_ES).filter(_ES.id == payload.exam_subject_id).first()
+        exam_name = ""
+        subject_name = ""
+        if es:
+            subject_name = es.subject.name if es.subject else "a subject"
+            ex = db.query(_EX).filter(_EX.id == es.exam_id).first()
+            exam_name = ex.name if ex else "an exam"
+        marks_str = f"{result.marks_obtained}/{es.max_marks}" if es else str(result.marks_obtained)
+        # Notify student
+        db.add(_Notif(
+            user_id=student.id,
+            title=f"Marks Updated — {subject_name}",
+            body=f"Your marks for {subject_name} ({exam_name}) have been entered: {marks_str} (Grade: {result.grade}).",
+            type="marks",
+        ))
+        # Notify each linked parent
+        for parent in student.parents:
+            db.add(_Notif(
+                user_id=parent.id,
+                title=f"Marks Updated: {student.name}",
+                body=f"{student.name} scored {marks_str} in {subject_name} ({exam_name}). Grade: {result.grade}.",
+                type="marks",
+            ))
+        db.commit()
+    return result
 
 
 # ===========================================================================
@@ -582,3 +640,92 @@ def attendance_history(
         q = q.filter(_AR.date <= to_date)
     records = q.order_by(_AR.date.desc()).offset(offset).limit(limit).all()
     return [{"id": r.id, "date": r.date, "status": r.status, "remarks": r.remarks} for r in records]
+
+
+# ===========================================================================
+# Parent — children, marks, attendance convenience endpoints
+# ===========================================================================
+
+from pydantic import BaseModel as _BM2
+
+
+class ChildOut(_BM2):
+    id: str
+    name: str
+    email: str
+    admission_number: Optional[str] = None
+    roll_number: Optional[str] = None
+    section: Optional[str] = None
+    class_name: Optional[str] = None
+    grade_level: Optional[int] = None
+    avatar_url: Optional[str] = None
+
+
+@router.get(
+    "/parents/me/children",
+    response_model=List[ChildOut],
+    tags=["Parents"],
+    summary="Get current parent's linked children",
+)
+def get_my_children(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> List[ChildOut]:
+    if current_user.role.name not in ("parent", "admin"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only parents can access this endpoint.")
+    result = []
+    for child in current_user.children:
+        sp = child.student_profile
+        class_name = None
+        grade_level = None
+        if sp and sp.current_class_id:
+            from app.models.academic import ClassRoom as _CR
+            cr = db.query(_CR).filter(_CR.id == sp.current_class_id).first()
+            if cr:
+                class_name = cr.name
+                grade_level = cr.grade_level
+        result.append(ChildOut(
+            id=child.id,
+            name=child.name,
+            email=child.email,
+            admission_number=sp.admission_number if sp else None,
+            roll_number=sp.roll_number if sp else None,
+            section=sp.section if sp else None,
+            class_name=class_name,
+            grade_level=grade_level,
+            avatar_url=child.avatar_url,
+        ))
+    return result
+
+
+@router.get(
+    "/parents/children/{student_id}/marks",
+    response_model=List[MarkRecordOut],
+    tags=["Parents"],
+    summary="Get marks for a linked child (parent-verified)",
+)
+def parent_child_marks(
+    student_id: str,
+    exam_id: Optional[str] = Query(None),
+    current_user: User = Depends(require_permission("marks:read")),
+    db: Session = Depends(get_db),
+) -> List[MarkRecordOut]:
+    _assert_student_access(current_user, student_id)
+    return svc.get_student_marks(db, student_id, exam_id)
+
+
+@router.get(
+    "/parents/children/{student_id}/attendance",
+    response_model=List[AttendanceRecordOut],
+    tags=["Parents"],
+    summary="Get attendance for a linked child (parent-verified)",
+)
+def parent_child_attendance(
+    student_id: str,
+    limit: int = Query(30, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    current_user: User = Depends(require_permission("attendance:read")),
+    db: Session = Depends(get_db),
+) -> List[AttendanceRecordOut]:
+    _assert_student_access(current_user, student_id)
+    return svc.get_attendance_records(db, student_id, limit, offset)

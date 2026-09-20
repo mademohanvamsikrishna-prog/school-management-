@@ -69,6 +69,20 @@ async def lifespan(app: FastAPI):
     # Enforce production DB policy at startup
     settings.enforce_production_database()
 
+    # Run incremental seed: ensure Dhanush family exists in DB
+    try:
+        from app.db.seed import seed_database, ensure_seed_invoices, seed_dhanush_family
+        from app.db.session import SessionLocal as _SL
+        _db = _SL()
+        try:
+            seed_database(_db)
+            ensure_seed_invoices(_db)
+            seed_dhanush_family(_db)
+        finally:
+            _db.close()
+    except Exception as _seed_err:
+        print(f"[WARNING] Seed step failed (non-fatal): {_seed_err}")
+
     yield
 
     print(f"[{settings.APP_NAME}] Shutting down.")

@@ -506,10 +506,211 @@ def ensure_seed_invoices(db: Session) -> None:
     print("[SUCCESS] Verified and ensured all student fee invoices.")
 
 
+def seed_dhanush_family(db: Session) -> None:
+    """
+    Seeds parent Dhanush linked to children Charitha and Rajesh.
+    Safe to call multiple times — guarded by email check.
+    """
+    # Guard: skip if already seeded
+    if db.query(User).filter(User.email == "dhanush@school.edu").first():
+        print("[INFO] Dhanush family already seeded. Skipping.")
+        return
+
+    print("[INFO] Seeding Dhanush family (parent + 2 children)...")
+    hashed_pwd = get_password_hash("password123")
+
+    # Fetch roles (already exist from seed_database)
+    role_parent  = db.query(Role).filter(Role.name == "parent").first()
+    role_student = db.query(Role).filter(Role.name == "student").first()
+    if not role_parent or not role_student:
+        print("[WARNING] Roles not found — run seed_database() first.")
+        return
+
+    # ── Resolve Class 10-A and Class 7-B (already seeded) ──────────────────
+    class_10a = db.query(ClassRoom).filter(ClassRoom.name == "Class 10 - A").first()
+    class_7b  = db.query(ClassRoom).filter(ClassRoom.name == "Class 7 - B").first()
+
+    # ── Child 1: Charitha (Class 10 - A) ───────────────────────────────────
+    charitha = User(
+        email="charitha@school.edu",
+        hashed_password=hashed_pwd,
+        name="Charitha",
+        role_id=role_student.id,
+        avatar_url="https://i.pravatar.cc/150?u=charitha",
+    )
+    charitha.student_profile = StudentProfile(
+        roll_number="1015",
+        admission_number="ADM-2024-1015",
+        section="A",
+        date_of_birth="2009-07-22",
+        gender="Female",
+        blood_group="A+",
+        current_class_id=class_10a.id if class_10a else None,
+    )
+    db.add(charitha)
+
+    # ── Child 2: Rajesh (Class 7 - B) ──────────────────────────────────────
+    rajesh = User(
+        email="rajesh@school.edu",
+        hashed_password=hashed_pwd,
+        name="Rajesh",
+        role_id=role_student.id,
+        avatar_url="https://i.pravatar.cc/150?u=rajesh",
+    )
+    rajesh.student_profile = StudentProfile(
+        roll_number="7023",
+        admission_number="ADM-2024-7023",
+        section="B",
+        date_of_birth="2012-11-05",
+        gender="Male",
+        blood_group="O+",
+        current_class_id=class_7b.id if class_7b else None,
+    )
+    db.add(rajesh)
+
+    # ── Parent: Dhanush ─────────────────────────────────────────────────────
+    dhanush = User(
+        email="dhanush@school.edu",
+        hashed_password=hashed_pwd,
+        name="Dhanush",
+        role_id=role_parent.id,
+        avatar_url="https://i.pravatar.cc/150?u=dhanush",
+    )
+    dhanush.parent_profile = ParentProfile(
+        phone="+91 99887 76655",
+        alternate_phone="+91 99887 76656",
+        occupation="Business Owner",
+        address="Plot 12, Jubilee Hills, Hyderabad",
+    )
+    # Link children via parent_students junction table
+    dhanush.children.append(charitha)
+    dhanush.children.append(rajesh)
+    db.add(dhanush)
+    db.flush()
+
+    # ── Enrollments ─────────────────────────────────────────────────────────
+    if class_10a:
+        db.add(StudentEnrollment(student_id=charitha.id, class_id=class_10a.id, roll_number="1015"))
+    if class_7b:
+        db.add(StudentEnrollment(student_id=rajesh.id, class_id=class_7b.id, roll_number="7023"))
+    db.flush()
+
+    # ── 20-day attendance history ───────────────────────────────────────────
+    teacher_user = db.query(User).filter(User.email == "teacher@school.edu").first()
+    today = datetime.now(timezone.utc).date()
+    for i in range(20):
+        past_date = (today - timedelta(days=i)).strftime("%Y-%m-%d")
+        # Charitha absent on days 3 and 9
+        charitha_status = "absent" if i in (3, 9) else "present"
+        if class_10a:
+            db.add(AttendanceRecord(
+                student_id=charitha.id,
+                class_id=class_10a.id,
+                date=past_date,
+                status=charitha_status,
+                recorded_by_teacher_id=teacher_user.id if teacher_user else None,
+            ))
+        # Rajesh absent on day 6
+        rajesh_status = "absent" if i == 6 else "present"
+        if class_7b:
+            db.add(AttendanceRecord(
+                student_id=rajesh.id,
+                class_id=class_7b.id,
+                date=past_date,
+                status=rajesh_status,
+                recorded_by_teacher_id=teacher_user.id if teacher_user else None,
+            ))
+    db.flush()
+
+    # ── Marks (reuse existing Mid-Term exam if present) ─────────────────────
+    exam1 = db.query(Exam).filter(Exam.name == "Mid-Term Examination 2026").first()
+    if exam1 and class_10a:
+        sub_math = db.query(Subject).filter(Subject.code == "MATH101").first()
+        sub_sci  = db.query(Subject).filter(Subject.code == "SCI101").first()
+        sub_eng  = db.query(Subject).filter(Subject.code == "ENG101").first()
+
+        es_math = db.query(ExamSubject).filter(
+            ExamSubject.exam_id == exam1.id,
+            ExamSubject.class_id == class_10a.id,
+            ExamSubject.subject_id == (sub_math.id if sub_math else ""),
+        ).first()
+        es_sci = db.query(ExamSubject).filter(
+            ExamSubject.exam_id == exam1.id,
+            ExamSubject.class_id == class_10a.id,
+            ExamSubject.subject_id == (sub_sci.id if sub_sci else ""),
+        ).first()
+        es_eng = db.query(ExamSubject).filter(
+            ExamSubject.exam_id == exam1.id,
+            ExamSubject.class_id == class_10a.id,
+            ExamSubject.subject_id == (sub_eng.id if sub_eng else ""),
+        ).first()
+
+        tid = teacher_user.id if teacher_user else None
+        if es_math:
+            db.add(MarkRecord(exam_subject_id=es_math.id, student_id=charitha.id, marks_obtained=89.0, grade="A+", remarks="Excellent performance", entered_by_teacher_id=tid))
+        if es_sci:
+            db.add(MarkRecord(exam_subject_id=es_sci.id,  student_id=charitha.id, marks_obtained=85.0, grade="A",  remarks="Good practical work",  entered_by_teacher_id=tid))
+        if es_eng:
+            db.add(MarkRecord(exam_subject_id=es_eng.id,  student_id=charitha.id, marks_obtained=78.0, grade="B+", remarks="Solid essay writing",   entered_by_teacher_id=tid))
+        db.flush()
+
+    # ── Fee invoices ─────────────────────────────────────────────────────────
+    cat_tuition   = db.query(FeeCategory).filter(FeeCategory.name == "Tuition Fee").first()
+    cat_transport = db.query(FeeCategory).filter(FeeCategory.name == "Transport Fee").first()
+    cat_exam      = db.query(FeeCategory).filter(FeeCategory.name == "Examination Fee").first()
+
+    if cat_tuition:
+        inv_c1 = FeeInvoice(student_id=charitha.id, category_id=cat_tuition.id,   title="Tuition Fee - Term 1",     amount=15000.0, due_date="2026-08-15", status="paid")
+        inv_c2 = FeeInvoice(student_id=charitha.id, category_id=cat_tuition.id,   title="Tuition Fee - Term 2",     amount=15000.0, due_date="2026-12-15", status="pending")
+        inv_r1 = FeeInvoice(student_id=rajesh.id,   category_id=cat_tuition.id,   title="Tuition Fee - Term 1",     amount=12000.0, due_date="2026-08-15", status="paid")
+        inv_r2 = FeeInvoice(student_id=rajesh.id,   category_id=cat_tuition.id,   title="Tuition Fee - Term 2",     amount=12000.0, due_date="2026-12-15", status="pending")
+        db.add_all([inv_c1, inv_c2, inv_r1, inv_r2])
+        db.flush()
+        db.add(PaymentRecord(invoice_id=inv_c1.id, amount_paid=15000.0, payment_method="simulated_sandbox", transaction_reference="TXN-DHAN-0001", status="success"))
+        db.add(PaymentRecord(invoice_id=inv_r1.id, amount_paid=12000.0, payment_method="simulated_sandbox", transaction_reference="TXN-DHAN-0002", status="success"))
+
+    if cat_exam:
+        inv_ce = FeeInvoice(student_id=charitha.id, category_id=cat_exam.id, title="Examination Fee", amount=3500.0, due_date="2026-09-10", status="paid")
+        inv_re = FeeInvoice(student_id=rajesh.id,   category_id=cat_exam.id, title="Examination Fee", amount=2500.0, due_date="2026-11-10", status="pending")
+        db.add_all([inv_ce, inv_re])
+        db.flush()
+        db.add(PaymentRecord(invoice_id=inv_ce.id, amount_paid=3500.0, payment_method="simulated_sandbox", transaction_reference="TXN-DHAN-0003", status="success"))
+
+    # ── Welcome notifications for Dhanush ────────────────────────────────────
+    db.add(Notification(
+        user_id=dhanush.id,
+        title="Welcome to the School Portal",
+        body="You are now linked to Charitha and Rajesh. View their progress from your dashboard.",
+        type="info",
+    ))
+    db.add(Notification(
+        user_id=dhanush.id,
+        title="Fee Due Reminder",
+        body="Term 2 tuition fees are due for both Charitha and Rajesh. Please pay before the due date.",
+        type="finance",
+    ))
+    db.add(Notification(
+        user_id=charitha.id,
+        title="Welcome, Charitha!",
+        body="Your school portal account is ready. Check your timetable and results.",
+        type="info",
+    ))
+    db.add(Notification(
+        user_id=rajesh.id,
+        title="Welcome, Rajesh!",
+        body="Your school portal account is ready. Check your timetable and schedule.",
+        type="info",
+    ))
+
+    db.commit()
+    print("[SUCCESS] Dhanush family seeded: dhanush@school.edu, charitha@school.edu, rajesh@school.edu")
+
+
 if __name__ == "__main__":
     db = SessionLocal()
     try:
         seed_database(db)
         ensure_seed_invoices(db)
+        seed_dhanush_family(db)
     finally:
         db.close()

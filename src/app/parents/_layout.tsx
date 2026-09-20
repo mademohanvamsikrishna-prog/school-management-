@@ -3,6 +3,8 @@ import { Platform, View, Text } from 'react-native';
 import { COLORS } from '../../constants/theme';
 import { AuthGuard } from '../../components/guards/AuthGuard';
 import { ParentSidebar } from '../../components/parents/ParentSidebar';
+import { ParentChildProvider } from '../../context/ParentChildContext';
+
 
 export default function ParentsLayout() {
   const IS_WEB = Platform.OS === 'web';
@@ -112,19 +114,23 @@ export default function ParentsLayout() {
   if (IS_WEB) {
     return (
       <AuthGuard allowedRoles={['parent', 'admin']}>
-        <View style={{ flex: 1, flexDirection: 'row', backgroundColor: '#F1F5F9' }}>
-          <ParentSidebar />
-          <View style={{ flex: 1, overflow: 'hidden' }}>
-            {tabs}
+        <ParentChildProvider>
+          <View style={{ flex: 1, flexDirection: 'row', backgroundColor: '#F1F5F9' }}>
+            <ParentSidebar />
+            <View style={{ flex: 1, overflow: 'hidden' }}>
+              {tabs}
+            </View>
           </View>
-        </View>
+        </ParentChildProvider>
       </AuthGuard>
     );
   }
 
   return (
     <AuthGuard allowedRoles={['parent', 'admin']}>
-      {tabs}
+      <ParentChildProvider>
+        {tabs}
+      </ParentChildProvider>
     </AuthGuard>
   );
 }
