@@ -204,7 +204,7 @@ const styles = StyleSheet.create({
   },
   webContainer: {
     animation: 'fadeIn 1s ease-out',
-  },
+  } as any,
   cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
