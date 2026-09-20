@@ -69,15 +69,16 @@ async def lifespan(app: FastAPI):
     # Enforce production DB policy at startup
     settings.enforce_production_database()
 
-    # Run incremental seed: ensure Dhanush family exists in DB
+    # Run incremental seed: ensure all data exists in DB
     try:
-        from app.db.seed import seed_database, ensure_seed_invoices, seed_dhanush_family
+        from app.db.seed import seed_database, ensure_seed_invoices, seed_dhanush_family, seed_telugu_class_9c
         from app.db.session import SessionLocal as _SL
         _db = _SL()
         try:
             seed_database(_db)
             ensure_seed_invoices(_db)
             seed_dhanush_family(_db)
+            seed_telugu_class_9c(_db)
         finally:
             _db.close()
     except Exception as _seed_err:

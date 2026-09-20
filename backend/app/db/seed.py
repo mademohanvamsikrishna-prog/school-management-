@@ -706,11 +706,270 @@ def seed_dhanush_family(db: Session) -> None:
     print("[SUCCESS] Dhanush family seeded: dhanush@school.edu, charitha@school.edu, rajesh@school.edu")
 
 
+def seed_telugu_class_9c(db: Session) -> None:
+    """
+    Seeds Class 9 - C with 10 Telugu students, each with a parent.
+    Teacher: Priya Desai (teacher@school.edu) teaches this class.
+    Students appear in teacher blocks (My Classes, My Students, Attendance, Marks).
+    Idempotent — skips if already seeded.
+    """
+    if db.query(ClassRoom).filter(ClassRoom.name == "Class 9 - C").first():
+        print("[INFO] Class 9-C already seeded. Skipping.")
+        return
+
+    print("[INFO] Seeding Class 9-C with 10 Telugu students...")
+
+    # ── Resolve roles ──────────────────────────────────────────────────────────
+    student_role = db.query(Role).filter(Role.name == "student").first()
+    parent_role  = db.query(Role).filter(Role.name == "parent").first()
+    teacher_role = db.query(Role).filter(Role.name == "teacher").first()
+    if not student_role or not parent_role:
+        print("[WARNING] Roles not found — run seed_database() first.")
+        return
+
+    hashed_pwd = get_password_hash("password123")
+
+    # ── Teacher: Priya Desai (already exists) ─────────────────────────────────
+    teacher = db.query(User).filter(User.email == "teacher@school.edu").first()
+    if not teacher:
+        # Create a telugu teacher if Priya doesn't exist
+        teacher = User(
+            email="teacher@school.edu",
+            hashed_password=hashed_pwd,
+            name="Priya Desai",
+            role_id=teacher_role.id,
+            avatar_url="https://i.pravatar.cc/150?u=priya",
+        )
+        teacher.teacher_profile = TeacherProfile(
+            employee_id="TCH-1001",
+            department="Mathematics",
+            qualification="M.Sc. Mathematics, B.Ed.",
+            is_class_teacher=True,
+        )
+        db.add(teacher)
+        db.flush()
+
+    # ── Subjects (reuse existing or create) ───────────────────────────────────
+    sub_math = db.query(Subject).filter(Subject.code == "MATH101").first()
+    sub_sci  = db.query(Subject).filter(Subject.code == "SCI101").first()
+    sub_eng  = db.query(Subject).filter(Subject.code == "ENG101").first()
+    sub_tel  = db.query(Subject).filter(Subject.code == "TEL101").first()
+    if not sub_math:
+        sub_math = Subject(name="Mathematics", code="MATH101", department="Mathematics")
+        db.add(sub_math)
+    if not sub_sci:
+        sub_sci = Subject(name="Science", code="SCI101", department="Science")
+        db.add(sub_sci)
+    if not sub_eng:
+        sub_eng = Subject(name="English", code="ENG101", department="Languages")
+        db.add(sub_eng)
+    if not sub_tel:
+        sub_tel = Subject(name="Telugu", code="TEL101", department="Languages")
+        db.add(sub_tel)
+    db.flush()
+
+    # ── Classroom: Class 9 - C ─────────────────────────────────────────────────
+    class_9c = ClassRoom(
+        name="Class 9 - C",
+        grade_level=9,
+        section="C",
+        room_number="Room 301",
+        class_teacher_id=teacher.id,
+    )
+    db.add(class_9c)
+    db.flush()
+
+    # Update teacher's class_teacher_of_class_id if not set
+    if teacher.teacher_profile and not teacher.teacher_profile.class_teacher_of_class_id:
+        teacher.teacher_profile.class_teacher_of_class_id = class_9c.id
+
+    # ── ClassSubjects (Teacher teaches all 4 subjects in 9-C) ─────────────────
+    for subj in [sub_math, sub_sci, sub_eng, sub_tel]:
+        existing = db.query(ClassSubject).filter(
+            ClassSubject.class_id == class_9c.id,
+            ClassSubject.subject_id == subj.id
+        ).first()
+        if not existing:
+            db.add(ClassSubject(class_id=class_9c.id, subject_id=subj.id, teacher_id=teacher.id))
+    db.flush()
+
+    # ── Timetable for Class 9-C (Mon–Fri) ─────────────────────────────────────
+    timetable_slots = [
+        (sub_math, "08:30", "09:30", "Room 301"),
+        (sub_sci,  "09:30", "10:30", "Lab 2"),
+        (sub_eng,  "10:45", "11:45", "Room 301"),
+        (sub_tel,  "12:30", "13:30", "Room 301"),
+    ]
+    for day in range(1, 6):  # Monday=1 to Friday=5
+        for subj, start, end, room in timetable_slots:
+            db.add(TimetableEntry(
+                class_id=class_9c.id,
+                subject_id=subj.id,
+                teacher_id=teacher.id,
+                day_of_week=day,
+                start_time=start,
+                end_time=end,
+                room_number=room,
+            ))
+    db.flush()
+
+    # ── 10 Telugu students with parents ───────────────────────────────────────
+    students_data = [
+        # (student_name, email, gender, roll, adm, dob, parent_name, parent_email, parent_phone)
+        ("Sreeja Lakshmi",   "sreeja@school.edu",   "Female", "9001", "ADM-2025-9001", "2010-03-14", "Lakshmi Devi",    "lakshmi.devi@school.edu",    "+91 9876501001"),
+        ("Vamsi Krishna",    "vamsi@school.edu",    "Male",   "9002", "ADM-2025-9002", "2010-07-22", "Ramakrishna",     "ramakrishna.v@school.edu",   "+91 9876501002"),
+        ("Revathi Reddy",    "revathi@school.edu",  "Female", "9003", "ADM-2025-9003", "2010-01-09", "Suresh Reddy",    "suresh.reddy@school.edu",    "+91 9876501003"),
+        ("Prasanth Kumar",   "prasanth@school.edu", "Male",   "9004", "ADM-2025-9004", "2010-11-30", "Venkata Prasad",  "venkata.prasad@school.edu",  "+91 9876501004"),
+        ("Anusha Varma",     "anusha@school.edu",   "Female", "9005", "ADM-2025-9005", "2010-05-18", "Nirmala Varma",   "nirmala.varma@school.edu",   "+91 9876501005"),
+        ("Karthik Nair",     "karthik@school.edu",  "Male",   "9006", "ADM-2025-9006", "2010-08-03", "Rajesh Nair",     "rajesh.nair@school.edu",     "+91 9876501006"),
+        ("Divya Subramani",  "divya@school.edu",    "Female", "9007", "ADM-2025-9007", "2010-02-25", "Padmavathi",      "padmavathi.s@school.edu",    "+91 9876501007"),
+        ("Rohit Chowdary",   "rohit@school.edu",    "Male",   "9008", "ADM-2025-9008", "2010-09-11", "Srinivasa Rao",   "srinivasa.rao@school.edu",   "+91 9876501008"),
+        ("Meghana Pillai",   "meghana@school.edu",  "Female", "9009", "ADM-2025-9009", "2010-06-07", "Gopala Krishnan", "gopala.pillai@school.edu",   "+91 9876501009"),
+        ("Suresh Babu",      "suresh@school.edu",   "Male",   "9010", "ADM-2025-9010", "2010-12-19", "Satyanarayana",   "satya.babu@school.edu",      "+91 9876501010"),
+    ]
+
+    today = datetime.now(timezone.utc).date()
+    grade_map = lambda pct: "A+" if pct >= 90 else "A" if pct >= 80 else "B+" if pct >= 70 else "B" if pct >= 60 else "C"
+
+    # Marks data: (math, sci, eng, tel) per student
+    marks_data = [
+        (88, 92, 85, 90),
+        (76, 82, 79, 88),
+        (94, 89, 91, 95),
+        (70, 74, 68, 72),
+        (85, 88, 83, 87),
+        (62, 68, 71, 65),
+        (91, 87, 93, 90),
+        (78, 80, 76, 82),
+        (83, 85, 88, 84),
+        (67, 71, 69, 73),
+    ]
+
+    # Exam for Class 9-C
+    exam_9c = Exam(
+        name="Mid-Term Examination 2026",
+        term="Term 1",
+        academic_year="2026-2027",
+        start_date="2026-09-15",
+        end_date="2026-09-25",
+        status="completed",
+    )
+    db.add(exam_9c)
+    db.flush()
+
+    es_math = ExamSubject(exam_id=exam_9c.id, class_id=class_9c.id, subject_id=sub_math.id, max_marks=100.0, passing_marks=35.0, exam_date="2026-09-16")
+    es_sci  = ExamSubject(exam_id=exam_9c.id, class_id=class_9c.id, subject_id=sub_sci.id,  max_marks=100.0, passing_marks=35.0, exam_date="2026-09-17")
+    es_eng  = ExamSubject(exam_id=exam_9c.id, class_id=class_9c.id, subject_id=sub_eng.id,  max_marks=100.0, passing_marks=35.0, exam_date="2026-09-18")
+    es_tel  = ExamSubject(exam_id=exam_9c.id, class_id=class_9c.id, subject_id=sub_tel.id,  max_marks=100.0, passing_marks=35.0, exam_date="2026-09-19")
+    db.add_all([es_math, es_sci, es_eng, es_tel])
+    db.flush()
+
+    fee_cat = db.query(FeeCategory).filter(FeeCategory.name == "Tuition Fee").first()
+    if not fee_cat:
+        fee_cat = FeeCategory(name="Tuition Fee", description="Quarterly academic tuition fees")
+        db.add(fee_cat)
+        db.flush()
+
+    for idx, (sname, semail, gender, roll, adm, dob, pname, pemail, pphone) in enumerate(students_data):
+        # Create student
+        student = User(
+            email=semail,
+            hashed_password=hashed_pwd,
+            name=sname,
+            role_id=student_role.id,
+            avatar_url=f"https://i.pravatar.cc/150?u={semail}",
+        )
+        student.student_profile = StudentProfile(
+            roll_number=roll,
+            admission_number=adm,
+            section="C",
+            date_of_birth=dob,
+            gender=gender,
+            blood_group="O+",
+        )
+        db.add(student)
+        db.flush()
+
+        # Update class id
+        student.student_profile.current_class_id = class_9c.id
+
+        # Enrollment
+        db.add(StudentEnrollment(student_id=student.id, class_id=class_9c.id, roll_number=roll))
+
+        # Attendance — 20 days, 2 absences for every 3rd student
+        for i in range(20):
+            past_date = (today - timedelta(days=i)).strftime("%Y-%m-%d")
+            att_status = "absent" if (i in (3, 15) and idx % 3 == 0) else "present"
+            db.add(AttendanceRecord(
+                student_id=student.id,
+                class_id=class_9c.id,
+                date=past_date,
+                status=att_status,
+                recorded_by_teacher_id=teacher.id,
+            ))
+
+        # Marks
+        m_scores = marks_data[idx]
+        for es, score, subname in [
+            (es_math, m_scores[0], "Mathematics"),
+            (es_sci,  m_scores[1], "Science"),
+            (es_eng,  m_scores[2], "English"),
+            (es_tel,  m_scores[3], "Telugu"),
+        ]:
+            db.add(MarkRecord(
+                exam_subject_id=es.id,
+                student_id=student.id,
+                marks_obtained=float(score),
+                grade=grade_map(score),
+                remarks=f"Good performance in {subname}",
+                entered_by_teacher_id=teacher.id,
+            ))
+
+        # Fee invoice
+        db.add(FeeInvoice(
+            student_id=student.id,
+            category_id=fee_cat.id,
+            title="Tuition Fee - Term 1",
+            amount=14000.0,
+            due_date="2026-12-15",
+            status="pending" if idx % 3 == 0 else "paid",
+        ))
+
+        # Parent
+        existing_parent = db.query(User).filter(User.email == pemail).first()
+        if not existing_parent:
+            parent_user = User(
+                email=pemail,
+                hashed_password=hashed_pwd,
+                name=pname,
+                role_id=parent_role.id,
+                avatar_url=f"https://i.pravatar.cc/150?u={pemail}",
+            )
+            parent_user.parent_profile = ParentProfile(
+                phone=pphone,
+                occupation="Parent",
+                address="Hyderabad, Telangana",
+            )
+            parent_user.children.append(student)
+            db.add(parent_user)
+        else:
+            if student not in existing_parent.children:
+                existing_parent.children.append(student)
+
+        db.flush()
+
+    db.commit()
+    print("[SUCCESS] Class 9-C seeded: 10 Telugu students, parents, timetable, attendance, marks, fees.")
+    print("  Sreeja, Vamsi, Revathi, Prasanth, Anusha, Karthik, Divya, Rohit, Meghana, Suresh")
+
+
 if __name__ == "__main__":
     db = SessionLocal()
     try:
         seed_database(db)
         ensure_seed_invoices(db)
         seed_dhanush_family(db)
+        seed_telugu_class_9c(db)
     finally:
         db.close()
+
