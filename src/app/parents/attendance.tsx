@@ -19,13 +19,15 @@ import { LoadingScreen, ErrorScreen } from '../../components/ScreenStates';
 import { DonutChart } from '../../components/DonutChart';
 import { COLORS, SIZES, FONTS, SHADOWS } from '../../constants/theme';
 import { useApi } from '../../hooks/useApi';
-import { getMyProfile } from '../../services/profile';
+import { useParentChild } from '../../context/ParentChildContext';
+import { Student } from '../../types/models';
 import {
   getAttendanceSummary,
   getAttendanceRecords,
   AttendanceRecord,
   AttendanceSummary,
 } from '../../services/attendance';
+
 
 const IS_WEB = Platform.OS === 'web';
 
@@ -46,17 +48,32 @@ function getDayOfWeek(dateStr: string): string {
 }
 
 export default function ParentAttendanceScreen() {
-  const { data: profile, loading: profileLoading, error: profileError, refetch: refetchProfile } = useApi(getMyProfile);
-  const children = profile?.parent_profile?.children || [];
+  // Use shared child context — selectedChildId is set by ChildSelector in sidebar/screen
+  const {
+    children: contextChildren,
+    selectedChildId,
+    setSelectedChildId,
+    activeChild,
+    isLoading: contextLoading,
+  } = useParentChild();
 
-  const [selectedChildId, setSelectedChildId] = useState<string | null>(null);
+  // Map ChildInfo → Student shape expected by ChildSelector
+  const children: Student[] = contextChildren.map((c) => ({
+    id: c.id,
+    name: c.name,
+    email: c.email || '',
+    role: 'student' as const,
+    className: c.className || '',
+    student_profile: {
+      roll_number: c.roll_number || '',
+      admission_number: c.admission_number || '',
+      section: c.section || '',
+      current_class_id: null,
+    },
+  } as any));
+
   const [selectedFilter, setSelectedFilter] = useState<'all' | 'present' | 'absent' | 'late' | 'half_day'>('all');
 
-  if (children.length > 0 && !selectedChildId) {
-    setSelectedChildId(children[0].id);
-  }
-
-  const activeChild = children.find(c => c.id === selectedChildId) || (children.length > 0 ? children[0] : null);
 
   const {
     data: summaryData,

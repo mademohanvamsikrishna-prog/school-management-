@@ -6,6 +6,10 @@ import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { useRouter, usePathname } from 'expo-router';
 import { COLORS, SIZES, FONTS, SHADOWS } from '../../constants/theme';
+import { ChildSelector } from '../ChildSelector';
+import { useParentChild } from '../../context/ParentChildContext';
+import { Student } from '../../types/models';
+
 
 interface NavItem {
   label: string;
@@ -31,6 +35,22 @@ const SECONDARY_NAV: NavItem[] = [
 export const ParentSidebar: React.FC = () => {
   const router = useRouter();
   const pathname = usePathname();
+  const { children, selectedChildId, setSelectedChildId } = useParentChild();
+
+  // Map ChildInfo → Student shape expected by ChildSelector
+  const childrenAsStudents: Student[] = children.map((c) => ({
+    id: c.id,
+    name: c.name,
+    email: c.email || '',
+    role: 'student' as const,
+    className: c.className || '',
+    student_profile: {
+      roll_number: c.roll_number || '',
+      admission_number: c.admission_number || '',
+      section: c.section || '',
+      current_class_id: null,
+    },
+  } as any));
 
   const isHighlighted = (item: NavItem): boolean => {
     if (pathname === item.route) return true;
@@ -70,6 +90,19 @@ export const ParentSidebar: React.FC = () => {
       <View style={styles.navGroup}>
         {PRIMARY_NAV.map(renderNavItem)}
       </View>
+
+      {/* Child Selector — shown only when parent has linked children */}
+      {childrenAsStudents.length > 0 && (
+        <>
+          <View style={styles.divider} />
+          <ChildSelector
+            childrenList={childrenAsStudents}
+            selectedChildId={selectedChildId || childrenAsStudents[0]?.id || ''}
+            onSelectChild={setSelectedChildId}
+            style={{ paddingHorizontal: 0, marginBottom: 0 }}
+          />
+        </>
+      )}
 
       <View style={{ flex: 1 }} />
 

@@ -19,8 +19,10 @@ import { ChildAvatar } from '../../components/ChildAvatar';
 import { LoadingScreen, ErrorScreen } from '../../components/ScreenStates';
 import { COLORS, SIZES, FONTS, SHADOWS } from '../../constants/theme';
 import { useApi } from '../../hooks/useApi';
-import { getMyProfile } from '../../services/profile';
+import { useParentChild } from '../../context/ParentChildContext';
+import { Student } from '../../types/models';
 import { getExams, getStudentMarks, Exam, MarkRecord } from '../../services/marks';
+
 
 const IS_WEB = Platform.OS === 'web';
 
@@ -42,18 +44,33 @@ function getGradeBadgeColor(grade: string): { bg: string; text: string; border: 
 }
 
 export default function ParentResultsScreen() {
-  const { data: profile, loading: profileLoading, error: profileError, refetch: refetchProfile } = useApi(getMyProfile);
-  const children = profile?.parent_profile?.children || [];
+  // Use shared child context
+  const {
+    children: contextChildren,
+    selectedChildId,
+    setSelectedChildId,
+    activeChild,
+    isLoading: contextLoading,
+  } = useParentChild();
 
-  const [selectedChildId, setSelectedChildId] = useState<string | null>(null);
+  // Map ChildInfo → Student shape for ChildSelector
+  const children: Student[] = contextChildren.map((c) => ({
+    id: c.id,
+    name: c.name,
+    email: c.email || '',
+    role: 'student' as const,
+    className: c.className || '',
+    student_profile: {
+      roll_number: c.roll_number || '',
+      admission_number: c.admission_number || '',
+      section: c.section || '',
+      current_class_id: null,
+    },
+  } as any));
+
   const [selectedExamId, setSelectedExamId] = useState<string | null>(null);
   const [selectedYear, setSelectedYear] = useState<string>('2026-2027');
 
-  if (children.length > 0 && !selectedChildId) {
-    setSelectedChildId(children[0].id);
-  }
-
-  const activeChild = children.find(c => c.id === selectedChildId) || (children.length > 0 ? children[0] : null);
 
   const { data: examsData, loading: examsLoading } = useApi(getExams);
 
