@@ -918,7 +918,7 @@ def teacher_my_timetable(
 ) -> List[TimetableEntryOut]:
     if current_user.role.name not in ("teacher", "staff", "admin"):
         raise HTTPException(status_code=403, detail="Teacher access only.")
-    return svc.get_teacher_timetable(current_user.id, day, db)
+    return svc.get_teacher_timetable(db, current_user.id, day)
 
 
 @router.get(
