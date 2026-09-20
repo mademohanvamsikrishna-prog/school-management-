@@ -4,25 +4,39 @@ import { Platform } from 'react-native';
  * Runtime environment configuration.
  *
  * API_BASE_URL resolution priority:
- *  1. EXPO_PUBLIC_API_BASE_URL  — set in Vercel / CI environment at build time.
- *     Example: https://school-api.onrender.com/api/v1
- *  2. Platform-specific localhost fallback — local development only.
- *     This value is NEVER reached in a Vercel/Render production build because
- *     EXPO_PUBLIC_API_BASE_URL will always be set there.
+ *  1. EXPO_PUBLIC_API_BASE_URL  — set in Vercel / CI at build time (recommended).
+ *  2. Railway production URL    — hard-coded fallback so Vercel builds work even
+ *     if EXPO_PUBLIC_API_BASE_URL is not configured in the dashboard.
+ *  3. localhost                 — only used when running `expo start` locally.
  *
- * To test locally against a different backend, create a .env.local file:
+ * To override locally, create a .env.local file:
  *   EXPO_PUBLIC_API_BASE_URL=http://localhost:8000/api/v1
  */
+
+const RAILWAY_URL = 'https://school-management-production-1d29.up.railway.app/api/v1';
+
 const _localFallback = Platform.select({
   web:     'http://localhost:8000/api/v1',
   android: 'http://10.0.2.2:8000/api/v1',
   default: 'http://localhost:8000/api/v1',
 }) as string;
 
+// In a real browser on Vercel, `window` exists but there is no local server.
+// Detect that case and always use Railway instead of localhost.
+const _isProductionBrowser =
+  typeof window !== 'undefined' &&
+  typeof window.location !== 'undefined' &&
+  !window.location.hostname.includes('localhost') &&
+  !window.location.hostname.includes('127.0.0.1') &&
+  !window.location.hostname.includes('10.0.2.2');
+
+const _effectiveFallback = _isProductionBrowser ? RAILWAY_URL : _localFallback;
+
 export const ENV = {
-  API_BASE_URL: (process.env.EXPO_PUBLIC_API_BASE_URL ?? _localFallback),
-  TIMEOUT_MS: 10000,
+  API_BASE_URL: process.env.EXPO_PUBLIC_API_BASE_URL ?? _effectiveFallback,
+  TIMEOUT_MS: 10_000,
   APP_NAME: 'School Management System',
   APP_VERSION: '1.0.0',
 };
+
 
