@@ -1,6 +1,7 @@
 import React from 'react';
-import { View, Text, StyleSheet, ViewStyle, TouchableOpacity, Image } from 'react-native';
+import { View, Text, StyleSheet, ViewStyle, TouchableOpacity } from 'react-native';
 import { COLORS, SIZES, FONTS, SHADOWS } from '../constants/theme';
+import { ChildAvatar } from './ChildAvatar';
 import { Student } from '../types/models';
 
 interface ChildSelectorProps {
@@ -31,13 +32,17 @@ export const ChildSelector: React.FC<ChildSelectorProps> = ({
               ]}
               onPress={() => onSelectChild(child.id)}
             >
-              <Image source={{ uri: child.avatarUrl }} style={styles.avatar} />
+              <ChildAvatar
+                name={child.name}
+                size={40}
+                style={{ marginRight: SIZES.sm }}
+              />
               <View style={styles.info}>
                 <Text style={[styles.name, isSelected && styles.selectedText]}>
                   {child.name}
                 </Text>
                 <Text style={[styles.className, isSelected && styles.selectedText]}>
-                  {child.className}
+                  {child.className || (child as any).student_profile?.class_name || 'Enrolled Student'}
                 </Text>
               </View>
             </TouchableOpacity>

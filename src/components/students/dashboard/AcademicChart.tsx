@@ -288,7 +288,7 @@ const styles = StyleSheet.create({
   },
   webContainer: {
     animation: 'fadeIn 0.8s ease-out',
-  },
+  } as any,
   cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',

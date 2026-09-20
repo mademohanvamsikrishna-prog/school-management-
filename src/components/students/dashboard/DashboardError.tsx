@@ -52,7 +52,7 @@ const styles = StyleSheet.create({
   },
   webContainer: {
     animation: 'fadeIn 0.5s ease-out',
-  },
+  } as any,
   iconCircle: {
     width: 64,
     height: 64,

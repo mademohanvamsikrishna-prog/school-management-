@@ -9,6 +9,7 @@ from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.models.user import User
+from app.models.finance import FeeInvoice
 from app.repositories import attendance_repository as att_repo
 from app.repositories import marks_repository as marks_repo
 from app.repositories import domain_repository as dom_repo
@@ -160,6 +161,26 @@ def simulate_payment(db: Session, req: PaymentSimulateRequest, student_id: str) 
     return PaymentRecordOut.model_validate(payment)
 
 
+def simulate_payment_for_user(db: Session, req: PaymentSimulateRequest, current_user: User) -> PaymentRecordOut:
+    inv = db.query(FeeInvoice).filter(FeeInvoice.id == req.invoice_id).first()
+    if not inv:
+        raise HTTPException(status_code=404, detail="Invoice not found.")
+
+    role_name = current_user.role.name if current_user.role else ""
+    if role_name == "student" and inv.student_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Students may only pay their own invoices.")
+    elif role_name == "parent":
+        child_ids = {child.id for child in current_user.children}
+        if inv.student_id not in child_ids:
+            raise HTTPException(status_code=403, detail="Parents may only pay invoices of their linked children.")
+
+    payment = dom_repo.record_simulated_payment(db, req.invoice_id, req.amount)
+    if not payment:
+        raise HTTPException(status_code=404, detail="Invoice not found.")
+    db.commit()
+    return PaymentRecordOut.model_validate(payment)
+
+
 # ---------------------------------------------------------------------------
 # Events / Notifications
 # ---------------------------------------------------------------------------
@@ -204,10 +225,32 @@ def get_full_profile(db: Session, user: User) -> FullProfileOut:
 
     if user.parent_profile:
         children = dom_repo.get_children_for_parent(db, user)
+        child_list = []
+        for c in children:
+            sp_data = None
+            if c.student_profile:
+                enr = dom_repo.get_student_enrollment(db, c.id)
+                sp_data = {
+                    "roll_number": c.student_profile.roll_number,
+                    "admission_number": c.student_profile.admission_number,
+                    "section": c.student_profile.section,
+                    "class_name": enr.classroom.name if enr and enr.classroom else None,
+                    "grade_level": enr.classroom.grade_level if enr and enr.classroom else None,
+                    "date_of_birth": c.student_profile.date_of_birth,
+                    "gender": c.student_profile.gender,
+                    "blood_group": c.student_profile.blood_group,
+                }
+            child_list.append({
+                "id": c.id,
+                "name": c.name,
+                "email": c.email,
+                "avatar_url": c.avatar_url,
+                "student_profile": sp_data,
+            })
         pp = ParentProfileOut(
             occupation=user.parent_profile.occupation,
             alternate_phone=user.parent_profile.alternate_phone,
-            children=[{"id": c.id, "name": c.name, "email": c.email} for c in children],
+            children=child_list,
         )
 
     return FullProfileOut(

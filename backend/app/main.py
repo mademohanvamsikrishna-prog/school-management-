@@ -95,27 +95,15 @@ def create_application() -> FastAPI:
 
     # -----------------------------------------------------------------------
     # CORS Middleware
-    # NOTE: "*" wildcard CANNOT be used together with allow_credentials=True
-    #       (browsers reject such responses). Use an explicit origin list instead.
+    # Origins are managed via CORS_ORIGINS env var → settings.get_cors_origins()
+    # NOTE: "*" wildcard is blocked at settings level when credentials=True
     # -----------------------------------------------------------------------
-    origins = [
-        # ── Production frontend (Vercel) ──────────────────────────────────
-        "https://school-management-smoky-six.vercel.app",           # main deployment
-        "https://school-management-git-main-mademohanvamsikrishna-8090.vercel.app",  # git preview
-        # ── Local development ─────────────────────────────────────────────
-        "http://localhost:3000",    # React / Next.js
-        "http://localhost:5173",    # Vite
-        "http://localhost:8081",    # Expo web
-        "http://localhost:19006",   # Expo web (alternate port)
-        "http://localhost:8000",    # FastAPI local docs
-    ]
-
     application.add_middleware(
         CORSMiddleware,
-        allow_origins=origins,      # exact list — no trailing slashes
+        allow_origins=settings.get_cors_origins(),
         allow_credentials=True,
-        allow_methods=["*"],        # GET, POST, PUT, DELETE, OPTIONS, PATCH
-        allow_headers=["*"],        # Content-Type, Authorization, etc.
+        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+        allow_headers=["Authorization", "Content-Type", "Accept", "X-Request-ID"],
     )
 
 

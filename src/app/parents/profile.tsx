@@ -42,9 +42,18 @@ export default function ProfileScreen() {
           <ActivityIndicator size="large" color={COLORS.primary} />
         ) : (
           <View style={styles.card}>
-            <Text style={styles.name}>{profile.name}</Text>
-            <Text style={styles.role}>{profile.role.toUpperCase()}</Text>
-            <Text style={styles.detail}>{profile.email}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: SIZES.md, marginBottom: SIZES.md }}>
+              <View style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: COLORS.primary, alignItems: 'center', justifyContent: 'center' }}>
+                <Text style={{ color: '#fff', fontSize: 24, fontWeight: '700' }}>
+                  {profile.name?.trim().split(' ')[0]?.[0]?.toUpperCase() || 'P'}
+                </Text>
+              </View>
+              <View>
+                <Text style={styles.name}>{profile.name}</Text>
+                <Text style={styles.role}>{profile.role.toUpperCase()}</Text>
+              </View>
+            </View>
+            <Text style={styles.detail}>✉️ {profile.email}</Text>
             
             {profile.parent_profile && (
               <>
