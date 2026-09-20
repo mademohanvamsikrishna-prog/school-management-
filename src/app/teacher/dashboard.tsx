@@ -1,464 +1,422 @@
 /**
- * TeacherDashboard — Acade-style visual redesign.
+ * TeacherDashboard — Rebuilt using the Student block-component pattern.
  *
- * DESIGN ONLY: All API calls, hooks, services, and routing are unchanged.
- * Sidebar is owned by _layout.tsx — this file renders only the main content area.
+ * Blocks:
+ *   ① Welcome banner (teacher name, department, today's date)
+ *   ② Stat cards: Today's Classes, Total Students, Avg Attendance %, Pending notifications
+ *   ③ Today's timetable (horizontal scroll period cards)
+ *   ④ Class attendance overview (per-class bar)
+ *   ⑤ Quick actions: Mark Attendance, Enter Marks, View Students, Message, Timetable
+ *   ⑥ Upcoming events
+ *
+ * APIs (all existing or newly added):
+ *   GET /dashboard/summary
+ *   GET /teacher/me/timetable?day={today}
+ *   GET /teacher/me/classes
+ *   GET /teacher/me/attendance/stats
+ *   GET /events?upcoming_only=true
+ *   GET /notifications/me
+ *   GET /profile/me
  */
 import React, { useMemo } from 'react';
 import {
-  ScrollView,
-  View,
-  StyleSheet,
-  SafeAreaView,
-  Text,
-  Platform,
-  TouchableOpacity,
-  Image,
+  ScrollView, View, StyleSheet, SafeAreaView, Text,
+  Platform, TouchableOpacity,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { LoadingScreen, ErrorScreen } from '../../components/ScreenStates';
-import { DonutChart } from '../../components/DonutChart';
-import { COLORS, SIZES, FONTS, SHADOWS } from '../../constants/theme';
 import { useAuth } from '../../context/AuthContext';
 import { useApi } from '../../hooks/useApi';
 import { getDashboardSummary } from '../../services/dashboard';
 import { getEvents } from '../../services/events';
-import { getTeacherTimetable } from '../../services/timetable';
+import { getMyNotifications } from '../../services/notifications';
 import { getMyProfile } from '../../services/profile';
+import { api as apiClient } from '../../services/api';
+import { LoadingScreen, ErrorScreen } from '../../components/ScreenStates';
+import { COLORS, SIZES, FONTS, SHADOWS } from '../../constants/theme';
 
 const IS_WEB = Platform.OS === 'web';
 
+// ─── Local palette (teacher = purple accent) ──────────────────────────────────
+const C = {
+  bg: '#F1F5F9', card: '#FFFFFF', border: '#E2E8F0',
+  purple: '#7C3AED', purpleLight: '#F5F3FF', purpleDark: '#5B21B6',
+  indigo: '#4F46E5', indigoLight: '#EEF2FF',
+  green: '#10B981', greenLight: '#D1FAE5',
+  amber: '#F59E0B', amberLight: '#FEF3C7',
+  red: '#EF4444', redLight: '#FEE2E2',
+  blue: '#3B82F6', blueLight: '#EFF6FF',
+  textDark: '#0F172A', textMid: '#334155', textSub: '#64748B', textLight: '#94A3B8',
+};
+
+// ─── API helpers ──────────────────────────────────────────────────────────────
+async function fetchTodayTimetable(userId: string | undefined, day: number) {
+  if (!userId) return [];
+  const res = await apiClient.get(`/timetable/teacher/${userId}?day=${day}`);
+  return res.data as any[];
+}
+async function fetchClasses()  { return (await apiClient.get('/teacher/me/classes')).data as any[]; }
+async function fetchAttStats() { return (await apiClient.get('/teacher/me/attendance/stats')).data as any[]; }
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+function formatTime(t: string) {
+  const [h, m] = t.split(':');
+  const hour = parseInt(h, 10);
+  const ampm = hour >= 12 ? 'PM' : 'AM';
+  return `${hour % 12 || 12}:${m} ${ampm}`;
+}
+
+function todayStr() {
+  return new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+}
+
+function todayBackendDay() {
+  const d = new Date().getDay();
+  return d === 0 ? 7 : d;
+}
+
+// ─── Sub-components ───────────────────────────────────────────────────────────
+function StatCard({ icon, label, value, sub, bg, color }: {
+  icon: string; label: string; value: string | number; sub?: string; bg: string; color: string;
+}) {
+  return (
+    <View style={[statStyles.card, { borderTopColor: color, borderTopWidth: 3 }]}>
+      <View style={[statStyles.iconWrap, { backgroundColor: bg }]}>
+        <Text style={statStyles.icon}>{icon}</Text>
+      </View>
+      <Text style={statStyles.value}>{value}</Text>
+      <Text style={statStyles.label}>{label}</Text>
+      {sub && <Text style={statStyles.sub}>{sub}</Text>}
+    </View>
+  );
+}
+
+function QuickAction({ icon, label, route, router }: {
+  icon: string; label: string; route: string; router: any;
+}) {
+  return (
+    <TouchableOpacity style={qaStyles.btn} onPress={() => router.push(route as any)} activeOpacity={0.8}>
+      <View style={qaStyles.iconBox}><Text style={{ fontSize: 22 }}>{icon}</Text></View>
+      <Text style={qaStyles.label}>{label}</Text>
+    </TouchableOpacity>
+  );
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
 export default function TeacherDashboard() {
   const router = useRouter();
   const { user } = useAuth();
+  const backendDay = todayBackendDay();
 
-  // ─── All existing API hooks (unchanged) ──────────────────────────────────
-  const { data: summary, loading: summaryLoading, refetch: refetchSummary } = useApi(getDashboardSummary);
-  const { data: events, loading: eventsLoading } = useApi(() => getEvents(true));
-  const { data: profile } = useApi(getMyProfile);
-
-  const jsDay = new Date().getDay();
-  const backendDay = jsDay === 0 ? 7 : jsDay;
-
-  const { data: timetable, loading: timetableLoading } = useApi(
-    async () => {
-      if (!user) return [];
-      return getTeacherTimetable(user.id, backendDay);
-    },
-    [user, backendDay]
+  const { data: summary,  loading: summaryLoading,  refetch } = useApi(getDashboardSummary);
+  const { data: events,   loading: eventsLoading  } = useApi(() => getEvents(true));
+  const { data: profile                            } = useApi(getMyProfile);
+  const { data: notifs                             } = useApi(getMyNotifications);
+  const { data: todayTT,  loading: ttLoading       } = useApi(
+    () => fetchTodayTimetable(user?.id, backendDay), [user?.id, backendDay]
   );
+  const { data: classes,  loading: classesLoading  } = useApi(fetchClasses);
+  const { data: attStats                           } = useApi(fetchAttStats);
 
-  // ─── Derived values ───────────────────────────────────────────────────────
-  const firstName = user?.name?.split(' ')[0] ?? 'Teacher';
-  const department = profile?.teacher_profile?.department ?? 'Staff';
-  const totalClasses = summary?.total_classes ?? 0;
-  const studentsCount = summary?.students_count ?? 0;
+  const isLoading = summaryLoading || eventsLoading || ttLoading || classesLoading;
 
-  // ─── Loading / error states ───────────────────────────────────────────────
-  const isLoading = summaryLoading || eventsLoading || timetableLoading;
-  const firstError = summary === null && !summaryLoading
-    ? { statusCode: 0, message: 'Could not load dashboard data.' }
-    : null;
+  const firstName   = user?.name?.split(' ')[0] ?? 'Teacher';
+  const department  = profile?.teacher_profile?.department ?? 'Staff';
+  const employeeId  = profile?.teacher_profile?.employee_id ?? '—';
+  const totalStudents = useMemo(() => {
+    if (!classes) return summary?.students_count ?? 0;
+    return (classes as any[]).reduce((sum: number, c: any) => sum + (c.student_count ?? 0), 0);
+  }, [classes, summary]);
+  const avgAttendance = useMemo(() => {
+    if (!attStats || (attStats as any[]).length === 0) return '—';
+    const avg = (attStats as any[]).reduce((s: number, c: any) => s + (c.attendance_pct ?? 0), 0) / (attStats as any[]).length;
+    return `${avg.toFixed(1)}%`;
+  }, [attStats]);
+  const unreadCount  = (notifs ?? []).filter((n: any) => !n.is_read).length;
+  const todayPeriods = useMemo(() => (todayTT ?? []).sort((a: any, b: any) => a.start_time.localeCompare(b.start_time)), [todayTT]);
 
-  if (isLoading) return <LoadingScreen message="Loading Dashboard..." />;
-  if (firstError) return <ErrorScreen error={firstError} onRetry={refetchSummary} />;
-  if (!summary || !user) return <LoadingScreen message="Loading Dashboard..." />;
+  if (isLoading && !summary) return <LoadingScreen message="Loading Dashboard…" />;
 
-  // ─── Render ───────────────────────────────────────────────────────────────
+  const SUBJECT_COLORS = ['#EEF2FF', '#F5F3FF', '#D1FAE5', '#FEF3C7', '#FEE2E2', '#E0F2FE'];
+  const SUBJECT_TEXT   = ['#4F46E5', '#7C3AED', '#059669', '#D97706', '#DC2626', '#0369A1'];
+  function periodColor(subject: string) {
+    const i = Math.abs([...subject].reduce((a, c) => a + c.charCodeAt(0), 0)) % SUBJECT_COLORS.length;
+    return { bg: SUBJECT_COLORS[i], text: SUBJECT_TEXT[i] };
+  }
+
   return (
     <SafeAreaView style={styles.safeArea}>
-      {IS_WEB ? (
-        // ══════════════════════════════════════
-        // WEB — sidebar owned by _layout.tsx
-        // ══════════════════════════════════════
-        <View style={styles.webMain}>
-          {/* Top header bar */}
-          <WebHeader user={user} subtitle={`${department} Department`} />
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
 
-          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.webContentPad}>
-            {/* Welcome */}
-            <View style={styles.welcomeRow}>
-              <Text style={styles.welcomeTitle}>Welcome, {firstName} 👋</Text>
-              <Text style={styles.welcomeSub}>{department} Department</Text>
+        {/* ① Welcome Banner */}
+        <View style={styles.welcomeBanner}>
+          <View style={styles.bannerLeft}>
+            <View style={styles.avatarCircle}>
+              <Text style={styles.avatarText}>{firstName[0]?.toUpperCase()}</Text>
             </View>
-
-            {/* TODAY'S CLASSES */}
-            <SectionLabel label="TODAY'S CLASSES" />
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.timetableRow}>
-              {timetable && timetable.length > 0 ? (
-                timetable.map((entry) => (
-                  <TimetableCard key={entry.id} entry={entry} isTeacher />
-                ))
-              ) : (
-                <View style={styles.emptyCard}>
-                  <Text style={styles.emptyText}>No classes scheduled today.</Text>
-                </View>
-              )}
-            </ScrollView>
-
-            {/* STATS ROW */}
-            <View style={styles.gridRow}>
-              {/* Classes & Students card */}
-              <View style={[styles.card, styles.donutCard]}>
-                <Text style={styles.cardTitle}>Overview</Text>
-                <Text style={styles.cardSub}>This Semester</Text>
-                <View style={styles.donutWrap}>
-                  <DonutChart
-                    percentage={totalClasses > 0 ? Math.min(100, (totalClasses / 10) * 100) : 0}
-                    size={150}
-                    strokeWidth={16}
-                    color={COLORS.primary}
-                    centerLabel={`${totalClasses}`}
-                    centerSublabel="Classes"
-                  />
-                </View>
-                <View style={styles.legend}>
-                  <LegendDot color={COLORS.primary} label={`${totalClasses} Classes`} />
-                  <LegendDot color={COLORS.success} label={`${studentsCount} Students`} />
-                </View>
-              </View>
-
-              {/* Notice Board */}
-              <View style={[styles.card, styles.noticeCard]}>
-                <Text style={styles.cardTitle}>Notice board</Text>
-                <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }}>
-                  {events && events.length > 0 ? (
-                    events.slice(0, 6).map((ev, idx) => (
-                      <NoticeItem key={ev.id} event={ev} idx={idx} />
-                    ))
-                  ) : (
-                    <Text style={styles.emptyText}>No notices.</Text>
-                  )}
-                </ScrollView>
-              </View>
+            <View>
+              <Text style={styles.welcomeGreet}>Good {greeting()}, {firstName}! 👋</Text>
+              <Text style={styles.welcomeSub}>{department} · ID {employeeId}</Text>
+              <Text style={styles.welcomeDate}>{todayStr()}</Text>
             </View>
-
-            {/* STATS CARD */}
-            <View style={[styles.card]}>
-              <Text style={styles.cardTitle}>Teaching Stats</Text>
-              <Text style={styles.cardSub}>This semester</Text>
-              <View style={styles.statsGrid}>
-                <StatPill label="Classes Assigned" value={totalClasses} color={COLORS.info} />
-                <StatPill label="Total Students" value={studentsCount} color={COLORS.success} />
-                {summary.upcoming_exams !== undefined && (
-                  <StatPill label="Upcoming Exams" value={summary.upcoming_exams} color={COLORS.warning} />
-                )}
+          </View>
+          {unreadCount > 0 && (
+            <TouchableOpacity style={styles.notifBell} onPress={() => router.push('/teacher/notifications' as any)}>
+              <Text style={{ fontSize: 20 }}>🔔</Text>
+              <View style={styles.notifDot}>
+                <Text style={styles.notifDotText}>{unreadCount}</Text>
               </View>
-            </View>
-
-            <View style={{ height: SIZES.xl }} />
-          </ScrollView>
+            </TouchableOpacity>
+          )}
         </View>
-      ) : (
-        // ══════════════════════════════════════
-        // MOBILE
-        // ══════════════════════════════════════
-        <>
-          <MobileHeader user={user} subtitle={`${department} Department`} />
-          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.mobileContent}>
-            <SectionLabel label="TODAY'S CLASSES" />
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.timetableRow}>
-              {timetable && timetable.length > 0 ? (
-                timetable.map((entry) => (
-                  <TimetableCard key={entry.id} entry={entry} compact isTeacher />
-                ))
-              ) : (
-                <View style={styles.emptyCard}>
-                  <Text style={styles.emptyText}>No classes today.</Text>
-                </View>
-              )}
+
+        {/* ② Stat Cards */}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.statsScroll}>
+          <View style={styles.statsRow}>
+            <StatCard icon="📚" label="Today's Classes"  value={todayPeriods.length}    bg={C.purpleLight} color={C.purple} />
+            <StatCard icon="🎓" label="Total Students"   value={totalStudents}          bg={C.indigoLight} color={C.indigo} />
+            <StatCard icon="📊" label="Avg Attendance"   value={avgAttendance}          bg={C.greenLight}  color={C.green}  sub="across classes" />
+            <StatCard icon="🏫" label="My Classes"       value={(classes ?? []).length} bg={C.amberLight}  color={C.amber}  />
+            <StatCard icon="🔔" label="Notifications"    value={unreadCount}            bg={C.redLight}    color={C.red}    sub="unread" />
+          </View>
+        </ScrollView>
+
+        {/* ③ Today's Timetable */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>📅 Today's Schedule</Text>
+            <TouchableOpacity onPress={() => router.push('/teacher/timetable' as any)}>
+              <Text style={styles.seeAll}>See all →</Text>
+            </TouchableOpacity>
+          </View>
+          {todayPeriods.length === 0 ? (
+            <View style={styles.emptyNote}>
+              <Text style={styles.emptyNoteText}>No classes today. Enjoy your day!</Text>
+            </View>
+          ) : (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              <View style={styles.periodRow}>
+                {todayPeriods.map((p: any, i: number) => {
+                  const subName = p.subject_name ?? p.subject?.name ?? 'Subject';
+                  const col = periodColor(subName);
+                  return (
+                    <View key={p.id ?? i} style={[styles.periodCard, { backgroundColor: col.bg }]}>
+                      <Text style={[styles.periodSubject, { color: col.text }]}>{subName}</Text>
+                      <Text style={styles.periodClass}>{p.class_name ?? p.class_room?.name ?? '—'}</Text>
+                      <Text style={styles.periodTime}>
+                        {formatTime(p.start_time)} – {formatTime(p.end_time)}
+                      </Text>
+                      {p.room_number && (
+                        <Text style={styles.periodRoom}>🚪 {p.room_number}</Text>
+                      )}
+                    </View>
+                  );
+                })}
+              </View>
             </ScrollView>
+          )}
+        </View>
 
-            <View style={styles.mobileStatsRow}>
-              <View style={[styles.miniStatCard, { borderLeftColor: COLORS.info }]}>
-                <Text style={styles.miniStatVal}>{totalClasses}</Text>
-                <Text style={styles.miniStatLabel}>Classes</Text>
-              </View>
-              <View style={[styles.miniStatCard, { borderLeftColor: COLORS.success }]}>
-                <Text style={styles.miniStatVal}>{studentsCount}</Text>
-                <Text style={styles.miniStatLabel}>Students</Text>
-              </View>
+        {/* ④ Class Attendance Overview */}
+        {(attStats ?? []).length > 0 && (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>📊 Class Attendance</Text>
+              <TouchableOpacity onPress={() => router.push('/teacher/attendance' as any)}>
+                <Text style={styles.seeAll}>Mark →</Text>
+              </TouchableOpacity>
             </View>
-
-            <SectionLabel label="NOTICE BOARD" actionText="View All" onAction={() => router.push('/teacher/classes')} />
-            <View style={[styles.card, { gap: SIZES.sm }]}>
-              {events && events.length > 0 ? (
-                events.slice(0, 4).map((ev, idx) => (
-                  <NoticeItem key={ev.id} event={ev} idx={idx} />
-                ))
-              ) : (
-                <Text style={styles.emptyText}>No upcoming events.</Text>
-              )}
+            <View style={styles.attCard}>
+              {(attStats as any[]).map((cls: any) => {
+                const pct = cls.attendance_pct ?? 0;
+                const barColor = pct >= 85 ? C.green : pct >= 70 ? C.amber : C.red;
+                return (
+                  <View key={cls.class_id} style={styles.attRow}>
+                    <View style={styles.attRowLeft}>
+                      <Text style={styles.attClassName}>{cls.class_name}</Text>
+                      <Text style={styles.attMeta}>{cls.student_count} students</Text>
+                    </View>
+                    <View style={styles.attBarWrap}>
+                      <View style={[styles.attBarFill, { width: `${Math.min(pct, 100)}%` as any, backgroundColor: barColor }]} />
+                    </View>
+                    <Text style={[styles.attPct, { color: barColor }]}>{pct}%</Text>
+                  </View>
+                );
+              })}
             </View>
+          </View>
+        )}
 
-            <SectionLabel label="QUICK ACTIONS" />
-            <View style={styles.quickRow}>
-              {[
-                { label: 'Classes',    icon: '👥', route: '/teacher/classes'  },
-                { label: 'Tasks',      icon: '📋', route: '/teacher/tasks'    },
-                { label: 'Messages',   icon: '💬', route: '/teacher/chat'     },
-                { label: 'Profile',    icon: '👤', route: '/teacher/profile'  },
-              ].map((qa) => (
-                <TouchableOpacity key={qa.label} style={styles.quickBtn} onPress={() => router.push(qa.route as any)}>
-                  <Text style={{ fontSize: 26 }}>{qa.icon}</Text>
-                  <Text style={styles.quickLabel}>{qa.label}</Text>
-                </TouchableOpacity>
+        {/* ⑤ Quick Actions */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>⚡ Quick Actions</Text>
+          <View style={styles.qaGrid}>
+            <QuickAction icon="📊" label="Mark Attendance"  route="/teacher/attendance"  router={router} />
+            <QuickAction icon="🏆" label="Enter Marks"      route="/teacher/marks"       router={router} />
+            <QuickAction icon="🎓" label="My Students"      route="/teacher/students"    router={router} />
+            <QuickAction icon="🗓️" label="Timetable"        route="/teacher/timetable"   router={router} />
+            <QuickAction icon="💬" label="Messages"         route="/teacher/chat"        router={router} />
+            <QuickAction icon="📋" label="Tasks"            route="/teacher/tasks"       router={router} />
+          </View>
+        </View>
+
+        {/* ⑥ Upcoming Events */}
+        {(events ?? []).length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>📅 Upcoming Events</Text>
+            <View style={styles.eventsCard}>
+              {(events as any[]).slice(0, 3).map((ev: any, i: number) => (
+                <View key={ev.id ?? i} style={[styles.eventRow, i > 0 && { borderTopWidth: 1, borderTopColor: C.border }]}>
+                  <View style={[styles.eventDateBox, { backgroundColor: C.purpleLight }]}>
+                    <Text style={[styles.eventDate, { color: C.purple }]}>
+                      {new Date(ev.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                    </Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.eventTitle}>{ev.title}</Text>
+                    <Text style={styles.eventMeta}>{ev.time} · {ev.location}</Text>
+                  </View>
+                  <View style={[styles.eventTypeBadge, { backgroundColor: C.purpleLight }]}>
+                    <Text style={[styles.eventTypeText, { color: C.purple }]}>{ev.type}</Text>
+                  </View>
+                </View>
               ))}
             </View>
+          </View>
+        )}
 
-            <View style={{ height: SIZES.xxl }} />
-          </ScrollView>
-        </>
-      )}
+        <View style={{ height: 40 }} />
+      </ScrollView>
     </SafeAreaView>
   );
 }
 
-// ─── Shared sub-components ────────────────────────────────────────────────────
-
-function WebHeader({ user, subtitle }: { user: { name: string; avatarUrl?: string }; subtitle?: string }) {
-  const firstName = user.name.split(' ')[0];
-  return (
-    <View style={styles.webHeader}>
-      <View style={{ flex: 1 }} />
-      <View style={styles.webHeaderRight}>
-        <TouchableOpacity style={styles.iconBtn}><Text style={{ fontSize: 18 }}>🔍</Text></TouchableOpacity>
-        <TouchableOpacity style={styles.iconBtn}>
-          <Text style={{ fontSize: 18 }}>🔔</Text>
-          <View style={styles.notifDot} />
-        </TouchableOpacity>
-        <View style={styles.userPill}>
-          {user.avatarUrl ? (
-            <Image source={{ uri: user.avatarUrl }} style={styles.pillAvatar} />
-          ) : (
-            <View style={[styles.pillAvatar, { backgroundColor: COLORS.primary, alignItems: 'center', justifyContent: 'center' }]}>
-              <Text style={{ color: '#fff', fontWeight: '700', fontSize: 13 }}>{firstName[0]}</Text>
-            </View>
-          )}
-          <Text style={styles.pillName}>{user.name}</Text>
-          <Text style={{ color: COLORS.textSecondary, fontSize: 12 }}>▾</Text>
-        </View>
-      </View>
-    </View>
-  );
-}
-
-function MobileHeader({ user, subtitle }: { user: { name: string; avatarUrl?: string }; subtitle?: string }) {
-  const firstName = user.name.split(' ')[0];
-  return (
-    <View style={styles.mobileHeader}>
-      <View>
-        <Text style={styles.mobileGreeting}>Good Morning, {firstName} 👋</Text>
-        {subtitle ? <Text style={styles.mobileSub}>{subtitle}</Text> : null}
-      </View>
-      <View style={styles.mobileHeaderRight}>
-        <TouchableOpacity style={styles.bellBtn}>
-          <Text style={{ fontSize: 20 }}>🔔</Text>
-          <View style={styles.bellDot} />
-        </TouchableOpacity>
-        {user.avatarUrl ? (
-          <Image source={{ uri: user.avatarUrl }} style={styles.mobileAvatar} />
-        ) : (
-          <View style={[styles.mobileAvatar, { backgroundColor: COLORS.primary, alignItems: 'center', justifyContent: 'center' }]}>
-            <Text style={{ color: '#fff', fontWeight: '700' }}>{firstName[0]}</Text>
-          </View>
-        )}
-      </View>
-    </View>
-  );
-}
-
-function TimetableCard({ entry, compact, isTeacher }: { entry: any; compact?: boolean; isTeacher?: boolean }) {
-  return (
-    <View style={[styles.ttCard, compact && styles.ttCardCompact]}>
-      <Text style={styles.ttTime}>{entry.start_time} – {entry.end_time}</Text>
-      <Text style={styles.ttSubject} numberOfLines={2}>{entry.subject_name ?? 'Subject'}</Text>
-      {isTeacher && entry.class_name ? (
-        <Text style={styles.ttRoom} numberOfLines={1}>{entry.class_name}</Text>
-      ) : entry.room_number ? (
-        <Text style={styles.ttRoom} numberOfLines={1}>{entry.room_number}</Text>
-      ) : null}
-    </View>
-  );
-}
-
-function SectionLabel({ label, actionText, onAction }: { label: string; actionText?: string; onAction?: () => void }) {
-  return (
-    <View style={styles.sectionRow}>
-      <Text style={styles.sectionLabel}>{label}</Text>
-      {actionText && (
-        <TouchableOpacity onPress={onAction}>
-          <Text style={styles.sectionAction}>{actionText}</Text>
-        </TouchableOpacity>
-      )}
-    </View>
-  );
-}
-
-const NOTICE_COLORS = ['#4F46E5', '#F59E0B', '#10B981', '#EF4444', '#6366F1', '#EC4899'];
-
-function NoticeItem({ event, idx }: { event: any; idx: number }) {
-  const accentColor = NOTICE_COLORS[idx % NOTICE_COLORS.length];
-  return (
-    <View style={styles.noticeItem}>
-      <View style={[styles.noticeLine, { backgroundColor: accentColor }]} />
-      <View style={{ flex: 1 }}>
-        <Text style={[styles.noticeAuthor, { color: accentColor }]} numberOfLines={1}>
-          {event.type ? event.type.toUpperCase() : 'NOTICE'}
-        </Text>
-        <Text style={styles.noticeTitle} numberOfLines={2}>{event.title}</Text>
-        {event.date ? <Text style={styles.noticeDate}>{event.date} · {event.time ?? ''}</Text> : null}
-      </View>
-    </View>
-  );
-}
-
-function LegendDot({ color, label }: { color: string; label: string }) {
-  return (
-    <View style={styles.legendItem}>
-      <View style={[styles.legendDot, { backgroundColor: color }]} />
-      <Text style={styles.legendLabel}>{label}</Text>
-    </View>
-  );
-}
-
-function StatPill({ label, value, color }: { label: string; value: any; color: string }) {
-  return (
-    <View style={[styles.statPill, { borderColor: color + '30', backgroundColor: color + '10' }]}>
-      <Text style={[styles.statPillVal, { color }]}>{value}</Text>
-      <Text style={styles.statPillLabel}>{label}</Text>
-    </View>
-  );
+function greeting() {
+  const h = new Date().getHours();
+  if (h < 12) return 'Morning';
+  if (h < 17) return 'Afternoon';
+  return 'Evening';
 }
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#F1F5F9' },
+  safeArea: { flex: 1, backgroundColor: C.bg },
+  scroll: { paddingBottom: 40 },
 
-  webMain: { flex: 1, flexDirection: 'column', overflow: 'hidden' },
-  webHeader: {
-    flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: SIZES.xl, paddingVertical: SIZES.md,
-    backgroundColor: COLORS.card, borderBottomWidth: 1, borderBottomColor: COLORS.border,
-    ...SHADOWS.small, zIndex: 5,
+  welcomeBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    margin: SIZES.lg,
+    backgroundColor: C.purple,
+    borderRadius: 20,
+    padding: SIZES.lg,
+    ...SHADOWS.medium,
   },
-  webHeaderRight: { flexDirection: 'row', alignItems: 'center', gap: SIZES.sm },
-  iconBtn: {
-    padding: SIZES.sm, borderRadius: SIZES.radiusSm,
-    backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: COLORS.border,
+  bannerLeft: { flexDirection: 'row', alignItems: 'center', gap: SIZES.md, flex: 1 },
+  avatarCircle: {
+    width: 52, height: 52, borderRadius: 26,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center', justifyContent: 'center',
   },
+  avatarText: { fontSize: 22, fontWeight: '800', color: '#FFF' },
+  welcomeGreet: { fontSize: 16, fontWeight: '700', color: '#FFF' },
+  welcomeSub: { fontSize: 12, color: 'rgba(255,255,255,0.8)', marginTop: 1 },
+  welcomeDate: { fontSize: 11, color: 'rgba(255,255,255,0.65)', marginTop: 1 },
+  notifBell: { position: 'relative', padding: SIZES.sm },
   notifDot: {
-    position: 'absolute', top: 6, right: 8,
-    width: 8, height: 8, borderRadius: 4,
-    backgroundColor: COLORS.error, borderWidth: 1.5, borderColor: COLORS.card,
+    position: 'absolute', top: 2, right: 2,
+    backgroundColor: C.red, borderRadius: 8,
+    width: 16, height: 16, alignItems: 'center', justifyContent: 'center',
   },
-  userPill: {
-    flexDirection: 'row', alignItems: 'center', gap: SIZES.sm,
-    backgroundColor: '#F8FAFC', borderRadius: SIZES.radiusRound,
-    borderWidth: 1, borderColor: COLORS.border,
-    paddingHorizontal: SIZES.sm, paddingVertical: 6,
-  },
-  pillAvatar: { width: 28, height: 28, borderRadius: 14, backgroundColor: COLORS.background },
-  pillName: { ...FONTS.body2, color: COLORS.textDark, fontWeight: '600' },
-  webContentPad: { padding: SIZES.xl },
+  notifDotText: { fontSize: 9, fontWeight: '800', color: '#FFF' },
 
-  welcomeRow: { marginBottom: SIZES.lg },
-  welcomeTitle: { fontSize: 22, fontWeight: '700', color: COLORS.textDark, letterSpacing: -0.3 },
-  welcomeSub: { ...FONTS.body2, color: COLORS.textSecondary, marginTop: 2 },
+  statsScroll: { marginBottom: SIZES.sm },
+  statsRow: { flexDirection: 'row', paddingHorizontal: SIZES.lg, gap: SIZES.sm },
 
-  sectionRow: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    marginBottom: SIZES.sm, marginTop: SIZES.xs,
-  },
-  sectionLabel: { fontSize: 11, fontWeight: '700', color: COLORS.textSecondary, letterSpacing: 1 },
-  sectionAction: { ...FONTS.body2, color: COLORS.primary, fontWeight: '600' },
+  section: { paddingHorizontal: SIZES.lg, marginBottom: SIZES.lg },
+  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: SIZES.sm },
+  sectionTitle: { ...FONTS.h4, color: C.textDark, fontWeight: '700' },
+  seeAll: { ...FONTS.body2, color: C.purple, fontWeight: '700' },
 
-  timetableRow: { gap: SIZES.md, paddingBottom: SIZES.md, paddingRight: SIZES.md },
-  ttCard: {
-    width: 190, backgroundColor: COLORS.card,
-    borderRadius: SIZES.radius, padding: SIZES.md,
-    borderWidth: 1, borderColor: COLORS.border, ...SHADOWS.small, gap: 6,
+  emptyNote: {
+    backgroundColor: C.card, borderRadius: 12, padding: SIZES.lg,
+    alignItems: 'center', borderWidth: 1, borderColor: C.border,
   },
-  ttCardCompact: { width: 150 },
-  ttTime: { fontSize: 12, fontWeight: '700', color: COLORS.primary, letterSpacing: 0.2 },
-  ttSubject: { ...FONTS.body1, fontWeight: '700', color: COLORS.textDark, lineHeight: 20 },
-  ttRoom: { ...FONTS.caption, color: COLORS.textSecondary },
+  emptyNoteText: { ...FONTS.body2, color: C.textSub },
 
-  card: {
-    backgroundColor: COLORS.card, borderRadius: SIZES.radius,
-    padding: SIZES.lg, borderWidth: 1, borderColor: COLORS.border,
-    ...SHADOWS.small, marginBottom: SIZES.md,
+  periodRow: { flexDirection: 'row', gap: SIZES.sm },
+  periodCard: {
+    width: 148, borderRadius: 14, padding: SIZES.md,
+    gap: 4, ...SHADOWS.small,
   },
-  cardTitle: { ...FONTS.h4, color: COLORS.textDark, marginBottom: 2 },
-  cardSub: { ...FONTS.caption, color: COLORS.textSecondary },
+  periodSubject: { ...FONTS.body2, fontWeight: '700' },
+  periodClass: { ...FONTS.caption, color: C.textSub },
+  periodTime: { ...FONTS.caption, color: C.textSub, marginTop: 4 },
+  periodRoom: { ...FONTS.caption, color: C.textLight },
 
-  gridRow: { flexDirection: 'row', gap: SIZES.md, marginBottom: SIZES.xs },
-  donutCard: { width: 280, alignItems: 'center' },
-  noticeCard: { flex: 1, maxHeight: 300 },
-  donutWrap: { marginTop: SIZES.md, marginBottom: SIZES.md },
+  attCard: {
+    backgroundColor: C.card, borderRadius: 14, padding: SIZES.md,
+    borderWidth: 1, borderColor: C.border, gap: SIZES.md, ...SHADOWS.small,
+  },
+  attRow: { flexDirection: 'row', alignItems: 'center', gap: SIZES.sm },
+  attRowLeft: { width: 100 },
+  attClassName: { ...FONTS.body2, color: C.textDark, fontWeight: '700' },
+  attMeta: { ...FONTS.caption, color: C.textSub },
+  attBarWrap: {
+    flex: 1, height: 8, backgroundColor: '#F1F5F9',
+    borderRadius: 4, overflow: 'hidden',
+  },
+  attBarFill: { height: 8, borderRadius: 4 },
+  attPct: { width: 40, textAlign: 'right', fontSize: 13, fontWeight: '700' },
 
-  legend: { flexDirection: 'row', gap: SIZES.md, flexWrap: 'wrap', justifyContent: 'center' },
-  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  legendDot: { width: 8, height: 8, borderRadius: 4 },
-  legendLabel: { ...FONTS.caption, color: COLORS.textSecondary },
+  qaGrid: {
+    flexDirection: 'row', flexWrap: 'wrap', gap: SIZES.sm,
+    marginTop: SIZES.sm,
+  },
 
-  noticeItem: {
-    flexDirection: 'row', gap: SIZES.sm,
-    paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#F1F5F9',
+  eventsCard: {
+    backgroundColor: C.card, borderRadius: 14,
+    borderWidth: 1, borderColor: C.border, overflow: 'hidden', ...SHADOWS.small,
   },
-  noticeLine: { width: 3, borderRadius: 4, alignSelf: 'stretch' },
-  noticeAuthor: { fontSize: 10, fontWeight: '700', letterSpacing: 0.5, marginBottom: 2 },
-  noticeTitle: { ...FONTS.body2, color: COLORS.textDark, fontWeight: '500', lineHeight: 18 },
-  noticeDate: { ...FONTS.caption, color: COLORS.textLight, marginTop: 2 },
-
-  statsGrid: { flexDirection: 'row', gap: SIZES.sm, marginTop: SIZES.md, flexWrap: 'wrap' },
-  statPill: {
-    flex: 1, minWidth: 140, borderRadius: SIZES.radius,
-    borderWidth: 1, padding: SIZES.md, alignItems: 'center',
-  },
-  statPillVal: { fontSize: 28, fontWeight: '800', letterSpacing: -0.5 },
-  statPillLabel: { ...FONTS.caption, color: COLORS.textSecondary, marginTop: 4 },
-
-  // Mobile
-  mobileHeader: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingHorizontal: SIZES.lg, paddingVertical: SIZES.md,
-    backgroundColor: COLORS.card, borderBottomWidth: 1, borderBottomColor: COLORS.border,
-    ...SHADOWS.small,
-  },
-  mobileGreeting: { fontSize: 18, fontWeight: '700', color: COLORS.textDark },
-  mobileSub: { ...FONTS.caption, color: COLORS.textSecondary, marginTop: 2 },
-  mobileHeaderRight: { flexDirection: 'row', alignItems: 'center', gap: SIZES.sm },
-  bellBtn: {
-    position: 'relative', padding: SIZES.sm,
-    backgroundColor: '#F8FAFC', borderRadius: 20, borderWidth: 1, borderColor: COLORS.border,
-  },
-  bellDot: {
-    position: 'absolute', top: 6, right: 8,
-    width: 8, height: 8, borderRadius: 4,
-    backgroundColor: COLORS.error, borderWidth: 1.5, borderColor: COLORS.card,
-  },
-  mobileAvatar: { width: 38, height: 38, borderRadius: 19, borderWidth: 2, borderColor: COLORS.primary },
-  mobileContent: { padding: SIZES.md },
-  mobileStatsRow: { flexDirection: 'row', gap: SIZES.sm, marginBottom: SIZES.md },
-  miniStatCard: {
-    flex: 1, backgroundColor: COLORS.card, borderRadius: SIZES.radiusSm,
-    padding: SIZES.md, borderLeftWidth: 3, ...SHADOWS.small,
-  },
-  miniStatVal: { ...FONTS.h3, color: COLORS.textDark },
-  miniStatLabel: { ...FONTS.caption, color: COLORS.textSecondary, marginTop: 2 },
-  quickRow: { flexDirection: 'row', flexWrap: 'wrap', gap: SIZES.sm, justifyContent: 'space-between', marginBottom: SIZES.md },
-  quickBtn: {
-    alignItems: 'center', justifyContent: 'center',
-    backgroundColor: COLORS.card, borderRadius: SIZES.radius,
-    padding: SIZES.md, width: '22%', aspectRatio: 1,
-    borderWidth: 1, borderColor: COLORS.border, ...SHADOWS.small,
-  },
-  quickLabel: { fontSize: 10, fontWeight: '600', color: COLORS.textDark, textAlign: 'center', marginTop: 4 },
-  emptyCard: {
-    width: 220, backgroundColor: COLORS.card, borderRadius: SIZES.radius,
-    padding: SIZES.xl, borderWidth: 1, borderColor: COLORS.border,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  emptyText: { ...FONTS.body2, color: COLORS.textLight, fontStyle: 'italic' },
+  eventRow: { flexDirection: 'row', alignItems: 'center', padding: SIZES.md, gap: SIZES.sm },
+  eventDateBox: { borderRadius: 10, paddingHorizontal: SIZES.sm, paddingVertical: 6, alignItems: 'center', minWidth: 54 },
+  eventDate: { fontSize: 12, fontWeight: '700' },
+  eventTitle: { ...FONTS.body2, color: C.textDark, fontWeight: '700' },
+  eventMeta: { ...FONTS.caption, color: C.textSub, marginTop: 1 },
+  eventTypeBadge: { borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
+  eventTypeText: { fontSize: 10, fontWeight: '700', textTransform: 'capitalize' },
 });
+
+const statStyles = StyleSheet.create({
+  card: {
+    width: 130, backgroundColor: C.card, borderRadius: 14,
+    padding: SIZES.md, gap: 4, ...SHADOWS.small,
+    borderWidth: 1, borderColor: C.border,
+  },
+  iconWrap: { width: 38, height: 38, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
+  icon: { fontSize: 18 },
+  value: { fontSize: 24, fontWeight: '800', color: C.textDark },
+  label: { ...FONTS.caption, color: C.textSub, fontWeight: '600' },
+  sub: { ...FONTS.caption, color: C.textLight },
+});
+
+const qaStyles = StyleSheet.create({
+  btn: {
+    width: '30%',
+    backgroundColor: C.card,
+    borderRadius: 14,
+    padding: SIZES.md,
+    alignItems: 'center',
+    gap: 6,
+    borderWidth: 1,
+    borderColor: C.border,
+    ...SHADOWS.small,
+    flexGrow: 1,
+  },
+  iconBox: {
+    width: 44, height: 44, borderRadius: 12,
+    backgroundColor: C.purpleLight, alignItems: 'center', justifyContent: 'center',
+  },
+  label: { ...FONTS.caption, color: C.textMid, fontWeight: '700', textAlign: 'center' },
+});
+
