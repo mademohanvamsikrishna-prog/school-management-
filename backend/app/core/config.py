@@ -29,8 +29,13 @@ class Settings(BaseSettings):
     #
     # DO NOT use "*" — it is incompatible with allow_credentials=True (CORS spec).
     CORS_ORIGINS: Union[str, List[str]] = (
+        # ── Production frontend (always allowed) ──────────────────────────
+        "https://school-management-smoky-six.vercel.app,"
+        "https://school-management-git-main-mademohanvamsikrishna-8090.vercel.app,"
+        # ── Local development ─────────────────────────────────────────────
         "http://localhost:8081,"
         "http://localhost:19006,"
+        "http://localhost:5173,"
         "http://localhost:3000,"
         "http://localhost:8000,"
         "http://127.0.0.1:8081,"
