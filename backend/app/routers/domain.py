@@ -264,7 +264,7 @@ def simulate_payment(
     current_user: User = Depends(require_permission("finance:pay_mock")),
     db: Session = Depends(get_db),
 ) -> PaymentRecordOut:
-    return svc.simulate_payment(db, payload, student_id=current_user.id)
+    return svc.simulate_payment_for_user(db, payload, current_user=current_user)
 
 
 # ===========================================================================
