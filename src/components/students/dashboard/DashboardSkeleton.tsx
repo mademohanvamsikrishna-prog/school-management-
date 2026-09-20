@@ -53,7 +53,7 @@ const styles = StyleSheet.create({
     background: 'linear-gradient(90deg, #F1F5F9 25%, #E2E8F0 50%, #F1F5F9 75%)',
     backgroundSize: '200% 100%',
     animation: 'shimmer 1.5s infinite linear',
-  },
+  } as any,
   skeletonHeader: {
     height: 140,
     backgroundColor: '#F1F5F9',

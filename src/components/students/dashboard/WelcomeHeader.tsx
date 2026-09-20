@@ -53,12 +53,14 @@ export const WelcomeHeader: React.FC<WelcomeHeaderProps> = ({ student, onProfile
         <TouchableOpacity
           activeOpacity={0.85}
           onPress={onProfilePress}
-          style={styles.avatarWrapper}
-          {...(IS_WEB ? { style: { ...styles.avatarWrapper, animation: 'scaleIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards' } as any } : {})}
+          style={[
+            styles.avatarWrapper,
+            IS_WEB && ({ animation: 'scaleIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards' } as any),
+          ]}
         >
           <View style={styles.avatarRing}>
             {student.avatar ? (
-              <Image source={{ uri: student.avatar }} style={styles.avatarImage} />
+              <Image source={{ uri: student.avatar }} style={styles.avatarImage as any} />
             ) : (
               <View style={styles.avatarFallback}>
                 <Text style={styles.avatarInitial}>{student.firstName[0] || 'S'}</Text>
@@ -70,8 +72,10 @@ export const WelcomeHeader: React.FC<WelcomeHeaderProps> = ({ student, onProfile
 
         {/* Center: Greeting & Info */}
         <View
-          style={styles.infoCol}
-          {...(IS_WEB ? { style: { ...styles.infoCol, animation: 'slideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards' } as any } : {})}
+          style={[
+            styles.infoCol,
+            IS_WEB && ({ animation: 'slideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards' } as any),
+          ]}
         >
           <View style={styles.topPillRow}>
             <View style={styles.datePill}>
@@ -134,7 +138,7 @@ const styles = StyleSheet.create({
   webContainer: {
     animation: 'fadeIn 0.5s ease-out',
     background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.9) 100%)',
-  },
+  } as any,
   contentRow: {
     flexDirection: 'row',
     alignItems: 'center',
