@@ -98,16 +98,10 @@ def create_application() -> FastAPI:
     # -----------------------------------------------------------------------
     application.add_middleware(
         CORSMiddleware,
-        allow_origins=[
-            "http://localhost:3000",
-            "http://localhost:8081",
-            "https://school-management-smoky-six.vercel.app",
-            "https://school-management-git-main-mademohanvamsikrishna-8090.vercel.app",
-            "*",  # Allows any origin during testing
-        ],
+        allow_origins=settings.get_cors_origins(),
         allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
+        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+        allow_headers=["Authorization", "Content-Type", "Accept", "X-Request-ID"],
     )
 
 

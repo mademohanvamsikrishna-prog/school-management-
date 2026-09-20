@@ -17,10 +17,27 @@ export interface TeacherProfileData {
   class_teacher_of_name?: string;
 }
 
+export interface ChildInfo {
+  id: string;
+  name: string;
+  email: string;
+  avatar_url?: string;
+  student_profile?: {
+    roll_number?: string;
+    admission_number?: string;
+    section?: string;
+    class_name?: string;
+    grade_level?: number;
+    date_of_birth?: string;
+    gender?: string;
+    blood_group?: string;
+  };
+}
+
 export interface ParentProfileData {
   occupation?: string;
   alternate_phone?: string;
-  children: { id: string; name: string; email: string }[];
+  children: ChildInfo[];
 }
 
 export interface FullProfile {

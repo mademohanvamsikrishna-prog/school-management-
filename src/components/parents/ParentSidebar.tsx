@@ -17,15 +17,15 @@ interface NavItem {
 const PRIMARY_NAV: NavItem[] = [
   { label: 'Dashboard', icon: '⊞',  route: '/parents/dashboard', segment: 'dashboard' },
   { label: 'Children',  icon: '👨‍👩‍👧', route: '/parents/children',  segment: 'children'  },
-  { label: 'Attendance',icon: '📊', route: '/parents/children',  segment: 'attendance' },
-  { label: 'Results',   icon: '🏆', route: '/parents/children',  segment: 'results'   },
+  { label: 'Attendance',icon: '📊', route: '/parents/attendance',segment: 'attendance'},
+  { label: 'Results',   icon: '🏆', route: '/parents/results',   segment: 'results'   },
   { label: 'Fees',      icon: '💳', route: '/parents/fees',      segment: 'fees'      },
   { label: 'Messages',  icon: '💬', route: '/parents/chat',      segment: 'chat'      },
 ];
 
 const SECONDARY_NAV: NavItem[] = [
-  { label: 'Settings', icon: '⚙️', route: '/parents/profile', segment: 'profile' },
-  { label: 'Help',     icon: '❓', route: '/parents/profile', segment: 'help'    },
+  { label: 'Settings', icon: '⚙️', route: '/parents/settings', segment: 'settings' },
+  { label: 'Help',     icon: '❓', route: '/parents/help',     segment: 'help'     },
 ];
 
 export const ParentSidebar: React.FC = () => {
@@ -34,7 +34,8 @@ export const ParentSidebar: React.FC = () => {
 
   const isHighlighted = (item: NavItem): boolean => {
     if (pathname === item.route) return true;
-    return pathname.endsWith(item.segment);
+    if (pathname === '/parents' && item.segment === 'dashboard') return true;
+    return pathname.endsWith(`/${item.segment}`) || pathname.includes(`/${item.segment}/`);
   };
 
   const renderNavItem = (item: NavItem) => {
