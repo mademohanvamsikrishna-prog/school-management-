@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, ViewStyle, Image, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
 import { COLORS, SIZES, FONTS, SHADOWS } from '../constants/theme';
+import { useAuth } from '../context/AuthContext';
 
 interface AppHeaderProps {
   title: string;
@@ -19,6 +20,10 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   showBack,
 }) => {
   const router = useRouter();
+  const { user } = useAuth();
+  const userName = user?.name?.trim() || '';
+  const firstName = userName.split(' ')[0] || '';
+  const initial = (firstName[0] || userName[0] || 'P').toUpperCase();
 
   return (
     <View style={[styles.container, style]}>
@@ -38,9 +43,16 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
           <Text style={styles.bell}>🔔</Text>
           <View style={styles.badge} />
         </View>
-        {avatarUrl && (
+        {userName ? (
+          <View style={styles.userPill}>
+            <View style={styles.initialAvatar}>
+              <Text style={styles.initialText}>{initial}</Text>
+            </View>
+            <Text style={styles.userNameText} numberOfLines={1}>{userName}</Text>
+          </View>
+        ) : avatarUrl ? (
           <Image source={{ uri: avatarUrl }} style={styles.avatar} />
-        )}
+        ) : null}
       </View>
     </View>
   );
@@ -117,5 +129,38 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.error,
     borderWidth: 1.5,
     borderColor: COLORS.card,
+  },
+  userPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(226, 232, 240, 0.9)',
+    paddingLeft: 4,
+    paddingRight: 12,
+    paddingVertical: 4,
+  },
+  initialAvatar: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: COLORS.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  initialText: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+    fontSize: 13,
+    textAlign: 'center',
+    includeFontPadding: false,
+  },
+  userNameText: {
+    ...FONTS.body2,
+    color: COLORS.textDark,
+    fontWeight: '600',
+    fontSize: 13,
   },
 });

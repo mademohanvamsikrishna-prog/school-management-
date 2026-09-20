@@ -13,6 +13,7 @@ from app.models import (
     ExamSubject,
     FeeCategory,
     FeeInvoice,
+    PaymentRecord,
     MarkRecord,
     Message,
     Notification,
@@ -397,12 +398,34 @@ def seed_database(db: Session) -> None:
     print("[INFO] Seeding finance invoices...")
     cat_tuition = FeeCategory(name="Tuition Fee", description="Quarterly academic tuition fees")
     cat_transport = FeeCategory(name="Transport Fee", description="School bus transportation charges")
-    db.add_all([cat_tuition, cat_transport])
+    cat_exam = FeeCategory(name="Examination Fee", description="Term and annual exam registration fees")
+    cat_activity = FeeCategory(name="Activity & Lab Fee", description="Laboratory, sports, and co-curricular charges")
+    db.add_all([cat_tuition, cat_transport, cat_exam, cat_activity])
     db.flush()
 
-    inv1 = FeeInvoice(student_id=student1.id, category_id=cat_tuition.id, title="Tuition Fee - Term 1", amount=15000.0, due_date="2026-08-15", status="paid")
-    inv2 = FeeInvoice(student_id=student1.id, category_id=cat_tuition.id, title="Tuition Fee - Term 2", amount=15000.0, due_date="2026-12-15", status="pending")
-    db.add_all([inv1, inv2])
+    # Rahul Sharma Invoices (student1)
+    inv_r1 = FeeInvoice(student_id=student1.id, category_id=cat_tuition.id, title="Tuition Fee - Term 1", amount=15000.0, due_date="2026-08-15", status="paid")
+    inv_r2 = FeeInvoice(student_id=student1.id, category_id=cat_tuition.id, title="Tuition Fee - Term 2", amount=15000.0, due_date="2026-12-15", status="pending")
+    inv_r3 = FeeInvoice(student_id=student1.id, category_id=cat_exam.id, title="Annual Examination Fee", amount=3500.0, due_date="2026-09-10", status="paid")
+    inv_r4 = FeeInvoice(student_id=student1.id, category_id=cat_transport.id, title="Transport Fee - Quarter 2", amount=6000.0, due_date="2026-10-15", status="pending")
+
+    # Ananya Gupta Invoices (student2)
+    inv_a1 = FeeInvoice(student_id=student2.id, category_id=cat_tuition.id, title="Tuition Fee - Term 1", amount=12500.0, due_date="2026-08-15", status="paid")
+    inv_a2 = FeeInvoice(student_id=student2.id, category_id=cat_tuition.id, title="Tuition Fee - Term 2", amount=12500.0, due_date="2026-12-15", status="pending")
+    inv_a3 = FeeInvoice(student_id=student2.id, category_id=cat_exam.id, title="Mid-Term Examination Fee", amount=2500.0, due_date="2026-11-10", status="pending")
+    inv_a4 = FeeInvoice(student_id=student2.id, category_id=cat_transport.id, title="Transport Fee - Quarter 1", amount=5500.0, due_date="2026-09-05", status="paid")
+    inv_a5 = FeeInvoice(student_id=student2.id, category_id=cat_activity.id, title="Activity & Science Lab Fee", amount=4000.0, due_date="2026-08-20", status="paid")
+
+    db.add_all([inv_r1, inv_r2, inv_r3, inv_r4, inv_a1, inv_a2, inv_a3, inv_a4, inv_a5])
+    db.flush()
+
+    # Payments records for paid invoices
+    pay_r1 = PaymentRecord(invoice_id=inv_r1.id, amount_paid=15000.0, payment_method="simulated_sandbox", transaction_reference="TXN-2026-88910", status="success")
+    pay_r3 = PaymentRecord(invoice_id=inv_r3.id, amount_paid=3500.0, payment_method="simulated_sandbox", transaction_reference="TXN-2026-88911", status="success")
+    pay_a1 = PaymentRecord(invoice_id=inv_a1.id, amount_paid=12500.0, payment_method="simulated_sandbox", transaction_reference="TXN-2026-88912", status="success")
+    pay_a4 = PaymentRecord(invoice_id=inv_a4.id, amount_paid=5500.0, payment_method="simulated_sandbox", transaction_reference="TXN-2026-88913", status="success")
+    pay_a5 = PaymentRecord(invoice_id=inv_a5.id, amount_paid=4000.0, payment_method="simulated_sandbox", transaction_reference="TXN-2026-88914", status="success")
+    db.add_all([pay_r1, pay_r3, pay_a1, pay_a4, pay_a5])
     db.flush()
 
     print("[INFO] Seeding chat conversation...")
@@ -420,9 +443,73 @@ def seed_database(db: Session) -> None:
     print("[SUCCESS] Database seeded successfully!")
 
 
+def ensure_seed_invoices(db: Session) -> None:
+    student2 = db.query(User).filter((User.email == "ananya.g@school.edu") | (User.email == "student2@school.edu") | (User.name == "Ananya Gupta")).first()
+    student1 = db.query(User).filter((User.email == "student@school.edu") | (User.name == "Rahul Sharma")).first()
+    if not student2 or not student1:
+        print("[WARNING] student1 or student2 not found for invoice seeding.")
+        return
+
+    # Check categories
+    cat_tuition = db.query(FeeCategory).filter(FeeCategory.name == "Tuition Fee").first()
+    if not cat_tuition:
+        cat_tuition = FeeCategory(name="Tuition Fee", description="Quarterly academic tuition fees")
+        db.add(cat_tuition)
+
+    cat_transport = db.query(FeeCategory).filter(FeeCategory.name == "Transport Fee").first()
+    if not cat_transport:
+        cat_transport = FeeCategory(name="Transport Fee", description="School bus transportation charges")
+        db.add(cat_transport)
+
+    cat_exam = db.query(FeeCategory).filter(FeeCategory.name == "Examination Fee").first()
+    if not cat_exam:
+        cat_exam = FeeCategory(name="Examination Fee", description="Term and annual exam registration fees")
+        db.add(cat_exam)
+
+    cat_activity = db.query(FeeCategory).filter(FeeCategory.name == "Activity & Lab Fee").first()
+    if not cat_activity:
+        cat_activity = FeeCategory(name="Activity & Lab Fee", description="Laboratory, sports, and co-curricular charges")
+        db.add(cat_activity)
+
+    db.flush()
+
+    # Check if student2 has invoices
+    existing_a = db.query(FeeInvoice).filter(FeeInvoice.student_id == student2.id).all()
+    if not existing_a:
+        print("[INFO] Seeding missing invoices for Ananya Gupta (student2)...")
+        inv_a1 = FeeInvoice(student_id=student2.id, category_id=cat_tuition.id, title="Tuition Fee - Term 1", amount=12500.0, due_date="2026-08-15", status="paid")
+        inv_a2 = FeeInvoice(student_id=student2.id, category_id=cat_tuition.id, title="Tuition Fee - Term 2", amount=12500.0, due_date="2026-12-15", status="pending")
+        inv_a3 = FeeInvoice(student_id=student2.id, category_id=cat_exam.id, title="Mid-Term Examination Fee", amount=2500.0, due_date="2026-11-10", status="pending")
+        inv_a4 = FeeInvoice(student_id=student2.id, category_id=cat_transport.id, title="Transport Fee - Quarter 1", amount=5500.0, due_date="2026-09-05", status="paid")
+        inv_a5 = FeeInvoice(student_id=student2.id, category_id=cat_activity.id, title="Activity & Science Lab Fee", amount=4000.0, due_date="2026-08-20", status="paid")
+        db.add_all([inv_a1, inv_a2, inv_a3, inv_a4, inv_a5])
+        db.flush()
+
+        pay_a1 = PaymentRecord(invoice_id=inv_a1.id, amount_paid=12500.0, payment_method="simulated_sandbox", transaction_reference="TXN-2026-88912", status="success")
+        pay_a4 = PaymentRecord(invoice_id=inv_a4.id, amount_paid=5500.0, payment_method="simulated_sandbox", transaction_reference="TXN-2026-88913", status="success")
+        pay_a5 = PaymentRecord(invoice_id=inv_a5.id, amount_paid=4000.0, payment_method="simulated_sandbox", transaction_reference="TXN-2026-88914", status="success")
+        db.add_all([pay_a1, pay_a4, pay_a5])
+        db.flush()
+
+    # Check if student1 has extra categories
+    existing_r_exam = db.query(FeeInvoice).filter(FeeInvoice.student_id == student1.id, FeeInvoice.title == "Annual Examination Fee").first()
+    if not existing_r_exam:
+        inv_r3 = FeeInvoice(student_id=student1.id, category_id=cat_exam.id, title="Annual Examination Fee", amount=3500.0, due_date="2026-09-10", status="paid")
+        inv_r4 = FeeInvoice(student_id=student1.id, category_id=cat_transport.id, title="Transport Fee - Quarter 2", amount=6000.0, due_date="2026-10-15", status="pending")
+        db.add_all([inv_r3, inv_r4])
+        db.flush()
+        pay_r3 = PaymentRecord(invoice_id=inv_r3.id, amount_paid=3500.0, payment_method="simulated_sandbox", transaction_reference="TXN-2026-88911", status="success")
+        db.add(pay_r3)
+        db.flush()
+
+    db.commit()
+    print("[SUCCESS] Verified and ensured all student fee invoices.")
+
+
 if __name__ == "__main__":
     db = SessionLocal()
     try:
         seed_database(db)
+        ensure_seed_invoices(db)
     finally:
         db.close()

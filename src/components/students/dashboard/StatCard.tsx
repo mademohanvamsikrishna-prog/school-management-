@@ -86,18 +86,16 @@ export const StatCard: React.FC<StatCardProps> = ({
     <TouchableOpacity
       activeOpacity={0.9}
       onPress={onPress}
-      style={[styles.container, IS_WEB && (styles.webContainer as any)]}
-      {...(IS_WEB
-        ? {
-            className: 'glass-panel glass-card-hover',
-            style: {
-              ...styles.container,
-              animation: `slideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) ${animationDelay}s forwards`,
-              opacity: 0,
-              animationFillMode: 'forwards',
-            } as any,
-          }
-        : {})}
+      style={[
+        styles.container,
+        IS_WEB && (styles.webContainer as any),
+        IS_WEB && ({
+          animation: `slideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) ${animationDelay}s forwards`,
+          opacity: 0,
+          animationFillMode: 'forwards',
+        } as any),
+      ]}
+      {...(IS_WEB ? { className: 'glass-panel glass-card-hover' } : {})}
     >
       {/* 3D gradient aura corner glow on web */}
       {IS_WEB && (
@@ -225,7 +223,7 @@ const styles = StyleSheet.create({
   },
   webContainer: {
     boxShadow: '0 8px 20px -4px rgba(15, 23, 42, 0.06), 0 4px 6px -2px rgba(15, 23, 42, 0.03)',
-  },
+  } as any,
   headerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
