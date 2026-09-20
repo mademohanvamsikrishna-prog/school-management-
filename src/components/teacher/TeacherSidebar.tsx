@@ -1,9 +1,8 @@
 /**
- * TeacherSidebar — left navigation panel for web/desktop (teacher role).
- * Pure UI component. Uses existing router.push() calls — no new routes created.
+ * TeacherSidebar — full 13-item scrollable sidebar, mirroring StudentSidebar.
  */
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
 import { useRouter, usePathname } from 'expo-router';
 import { COLORS, SIZES, FONTS, SHADOWS } from '../../constants/theme';
 
@@ -12,20 +11,25 @@ interface NavItem {
   icon: string;
   route: string;
   segment: string;
+  badge?: string;
 }
 
 const PRIMARY_NAV: NavItem[] = [
-  { label: 'Dashboard',  icon: '⊞',  route: '/teacher/dashboard', segment: 'dashboard' },
-  { label: 'My Classes', icon: '👥', route: '/teacher/classes',   segment: 'classes'   },
-  { label: 'Tasks',      icon: '📋', route: '/teacher/tasks',     segment: 'tasks'     },
-  { label: 'Attendance', icon: '📊', route: '/teacher/classes',   segment: 'attendance'},
-  { label: 'Results',    icon: '🏆', route: '/teacher/classes',   segment: 'results'   },
-  { label: 'Messages',   icon: '💬', route: '/teacher/chat',      segment: 'chat'      },
+  { label: 'Dashboard',     icon: '⊞',  route: '/teacher/dashboard',      segment: 'dashboard'      },
+  { label: 'My Classes',    icon: '👥', route: '/teacher/classes',         segment: 'classes'        },
+  { label: 'My Students',   icon: '🎓', route: '/teacher/students',        segment: 'students'       },
+  { label: 'Attendance',    icon: '📊', route: '/teacher/attendance',      segment: 'attendance'     },
+  { label: 'Marks / Results', icon: '🏆', route: '/teacher/marks',         segment: 'marks'          },
+  { label: 'Timetable',     icon: '🗓️', route: '/teacher/timetable',       segment: 'timetable'      },
+  { label: 'Assignments',   icon: '📋', route: '/teacher/tasks',           segment: 'tasks'          },
+  { label: 'Notifications', icon: '🔔', route: '/teacher/notifications',   segment: 'notifications'  },
+  { label: 'Messages',      icon: '💬', route: '/teacher/chat',            segment: 'chat'           },
+  { label: 'Profile',       icon: '👤', route: '/teacher/profile',         segment: 'profile'        },
 ];
 
 const SECONDARY_NAV: NavItem[] = [
-  { label: 'Settings', icon: '⚙️', route: '/teacher/profile', segment: 'profile' },
-  { label: 'Help',     icon: '❓', route: '/teacher/profile', segment: 'help'    },
+  { label: 'Settings', icon: '⚙️', route: '/teacher/profile', segment: 'settings' },
+  { label: 'Help',     icon: '❓', route: '/teacher/profile', segment: 'help'     },
 ];
 
 export const TeacherSidebar: React.FC = () => {
@@ -34,7 +38,8 @@ export const TeacherSidebar: React.FC = () => {
 
   const isHighlighted = (item: NavItem): boolean => {
     if (pathname === item.route) return true;
-    return pathname.endsWith(item.segment);
+    if (pathname === '/teacher' && item.segment === 'dashboard') return true;
+    return pathname.endsWith(`/${item.segment}`) || pathname.includes(`/${item.segment}/`);
   };
 
   const renderNavItem = (item: NavItem) => {
@@ -50,6 +55,11 @@ export const TeacherSidebar: React.FC = () => {
         <Text style={[styles.navLabel, highlighted && styles.navLabelActive]}>
           {item.label}
         </Text>
+        {item.badge && (
+          <View style={styles.badge}>
+            <Text style={styles.badgeText}>{item.badge}</Text>
+          </View>
+        )}
       </TouchableOpacity>
     );
   };
@@ -66,32 +76,19 @@ export const TeacherSidebar: React.FC = () => {
 
       <View style={styles.divider} />
 
-      <View style={styles.navGroup}>
+      {/* Primary navigation — scrollable */}
+      <ScrollView
+        style={{ flex: 1 }}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.navGroup}
+      >
         {PRIMARY_NAV.map(renderNavItem)}
-      </View>
 
-      <View style={{ flex: 1 }} />
-
-      <View style={styles.divider} />
-
-      <View style={[styles.navGroup, { marginBottom: SIZES.md }]}>
-        {SECONDARY_NAV.map((item) => {
-          const highlighted = isHighlighted(item);
-          return (
-            <TouchableOpacity
-              key={item.label}
-              style={[styles.navItem, highlighted && styles.navItemActive]}
-              onPress={() => router.push(item.route as any)}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.navIcon}>{item.icon}</Text>
-              <Text style={[styles.navLabel, highlighted && styles.navLabelActive]}>
-                {item.label}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
+        <View style={styles.divider} />
+        <Text style={styles.sectionLabel}>MORE</Text>
+        {SECONDARY_NAV.map(renderNavItem)}
+        <View style={{ height: SIZES.md }} />
+      </ScrollView>
     </View>
   );
 };
@@ -106,6 +103,7 @@ const styles = StyleSheet.create({
     paddingBottom: SIZES.md,
     ...SHADOWS.small,
     zIndex: 10,
+    flexDirection: 'column',
   },
   brand: {
     flexDirection: 'row',
@@ -118,12 +116,12 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 8,
-    backgroundColor: COLORS.primary,
+    backgroundColor: '#7C3AED',
     alignItems: 'center',
     justifyContent: 'center',
   },
   logoText: {
-    color: COLORS.white,
+    color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '700',
   },
@@ -142,7 +140,15 @@ const styles = StyleSheet.create({
   navGroup: {
     paddingHorizontal: SIZES.sm,
     gap: 2,
-    marginTop: SIZES.xs,
+    paddingTop: SIZES.xs,
+  },
+  sectionLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: COLORS.textLight,
+    letterSpacing: 1.2,
+    paddingHorizontal: SIZES.md,
+    paddingVertical: SIZES.xs,
   },
   navItem: {
     flexDirection: 'row',
@@ -153,7 +159,7 @@ const styles = StyleSheet.create({
     gap: SIZES.sm,
   },
   navItemActive: {
-    backgroundColor: '#EEF2FF',
+    backgroundColor: '#F5F3FF',
   },
   navIcon: {
     fontSize: 16,
@@ -167,7 +173,18 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   navLabelActive: {
-    color: COLORS.primary,
+    color: '#7C3AED',
+    fontWeight: '700',
+  },
+  badge: {
+    backgroundColor: '#7C3AED',
+    borderRadius: 10,
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+  },
+  badgeText: {
+    color: '#FFFFFF',
+    fontSize: 10,
     fontWeight: '700',
   },
 });

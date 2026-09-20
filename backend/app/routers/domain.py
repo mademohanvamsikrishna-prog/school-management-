@@ -729,3 +729,268 @@ def parent_child_attendance(
 ) -> List[AttendanceRecordOut]:
     _assert_student_access(current_user, student_id)
     return svc.get_attendance_records(db, student_id, limit, offset)
+
+
+# ===========================================================================
+# Teacher — classes, students, relationships, stats
+# ===========================================================================
+
+from app.models.academic import ClassRoom as _CR2, ClassSubject as _CS2, StudentEnrollment as _SE2
+from app.models.attendance import AttendanceRecord as _AR2
+
+
+class TeacherClassOut(_BM2):
+    id: str
+    name: str
+    grade_level: Optional[int] = None
+    section: Optional[str] = None
+    student_count: int = 0
+
+
+class TeacherStudentOut(_BM2):
+    id: str
+    name: str
+    email: str
+    roll_number: Optional[str] = None
+    section: Optional[str] = None
+    class_id: Optional[str] = None
+    class_name: Optional[str] = None
+    avatar_url: Optional[str] = None
+    attendance_pct: Optional[float] = None
+    parents: List[dict] = []
+
+
+class TeacherParentOut(_BM2):
+    id: str
+    name: str
+    email: str
+    phone: Optional[str] = None
+    student_name: str
+    student_class: Optional[str] = None
+
+
+@router.get(
+    "/teacher/me/classes",
+    response_model=List[TeacherClassOut],
+    tags=["Teacher"],
+    summary="Get current teacher's assigned classes",
+)
+def teacher_my_classes(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> List[TeacherClassOut]:
+    if current_user.role.name not in ("teacher", "staff", "admin"):
+        raise HTTPException(status_code=403, detail="Teacher access only.")
+    # Find all ClassSubject entries for this teacher
+    class_subjects = db.query(_CS2).filter(_CS2.teacher_id == current_user.id).all()
+    seen_class_ids: set = set()
+    result = []
+    for cs in class_subjects:
+        if cs.class_id in seen_class_ids:
+            continue
+        seen_class_ids.add(cs.class_id)
+        cr = db.query(_CR2).filter(_CR2.id == cs.class_id).first()
+        if not cr:
+            continue
+        count = db.query(_SE2).filter(_SE2.class_id == cr.id).count()
+        result.append(TeacherClassOut(
+            id=cr.id,
+            name=cr.name,
+            grade_level=cr.grade_level,
+            section=cr.section,
+            student_count=count,
+        ))
+    return result
+
+
+@router.get(
+    "/teacher/class/{class_id}/students",
+    response_model=List[TeacherStudentOut],
+    tags=["Teacher"],
+    summary="Get students in a specific class with parent info",
+)
+def teacher_class_students(
+    class_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> List[TeacherStudentOut]:
+    if current_user.role.name not in ("teacher", "staff", "admin"):
+        raise HTTPException(status_code=403, detail="Teacher access only.")
+    enrollments = db.query(_SE2).filter(_SE2.class_id == class_id).all()
+    cr = db.query(_CR2).filter(_CR2.id == class_id).first()
+    class_name = cr.name if cr else None
+    result = []
+    for enr in enrollments:
+        student = db.query(User).filter(User.id == enr.student_id).first()
+        if not student:
+            continue
+        sp = student.student_profile
+        # Attendance %
+        total = db.query(_AR2).filter(_AR2.student_id == student.id).count()
+        present = db.query(_AR2).filter(
+            _AR2.student_id == student.id, _AR2.status == "present"
+        ).count()
+        att_pct = round((present / total) * 100, 1) if total > 0 else None
+        # Parents
+        parent_list = [
+            {"id": p.id, "name": p.name, "email": p.email,
+             "phone": p.parent_profile.phone if p.parent_profile else None}
+            for p in student.parents
+        ]
+        result.append(TeacherStudentOut(
+            id=student.id,
+            name=student.name,
+            email=student.email,
+            roll_number=sp.roll_number if sp else None,
+            section=sp.section if sp else None,
+            class_id=class_id,
+            class_name=class_name,
+            avatar_url=student.avatar_url,
+            attendance_pct=att_pct,
+            parents=parent_list,
+        ))
+    return result
+
+
+@router.get(
+    "/teacher/me/students",
+    response_model=List[TeacherStudentOut],
+    tags=["Teacher"],
+    summary="Get all students across all teacher's classes",
+)
+def teacher_all_students(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> List[TeacherStudentOut]:
+    if current_user.role.name not in ("teacher", "staff", "admin"):
+        raise HTTPException(status_code=403, detail="Teacher access only.")
+    class_subjects = db.query(_CS2).filter(_CS2.teacher_id == current_user.id).all()
+    class_ids = list({cs.class_id for cs in class_subjects})
+    seen_student_ids: set = set()
+    result = []
+    for class_id in class_ids:
+        enrollments = db.query(_SE2).filter(_SE2.class_id == class_id).all()
+        cr = db.query(_CR2).filter(_CR2.id == class_id).first()
+        class_name = cr.name if cr else None
+        for enr in enrollments:
+            if enr.student_id in seen_student_ids:
+                continue
+            seen_student_ids.add(enr.student_id)
+            student = db.query(User).filter(User.id == enr.student_id).first()
+            if not student:
+                continue
+            sp = student.student_profile
+            total = db.query(_AR2).filter(_AR2.student_id == student.id).count()
+            present = db.query(_AR2).filter(
+                _AR2.student_id == student.id, _AR2.status == "present"
+            ).count()
+            att_pct = round((present / total) * 100, 1) if total > 0 else None
+            parent_list = [
+                {"id": p.id, "name": p.name, "email": p.email,
+                 "phone": p.parent_profile.phone if p.parent_profile else None}
+                for p in student.parents
+            ]
+            result.append(TeacherStudentOut(
+                id=student.id,
+                name=student.name,
+                email=student.email,
+                roll_number=sp.roll_number if sp else None,
+                section=sp.section if sp else None,
+                class_id=class_id,
+                class_name=class_name,
+                avatar_url=student.avatar_url,
+                attendance_pct=att_pct,
+                parents=parent_list,
+            ))
+    return result
+
+
+@router.get(
+    "/teacher/me/timetable",
+    response_model=List[TimetableEntryOut],
+    tags=["Teacher"],
+    summary="Get current teacher's timetable (all days or filtered)",
+)
+def teacher_my_timetable(
+    day: Optional[int] = Query(None, ge=1, le=6, description="1=Mon...6=Sat"),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> List[TimetableEntryOut]:
+    if current_user.role.name not in ("teacher", "staff", "admin"):
+        raise HTTPException(status_code=403, detail="Teacher access only.")
+    return svc.get_teacher_timetable(current_user.id, day, db)
+
+
+@router.get(
+    "/teacher/me/attendance/stats",
+    tags=["Teacher"],
+    summary="Attendance stats per class for the teacher",
+)
+def teacher_attendance_stats(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> list:
+    if current_user.role.name not in ("teacher", "staff", "admin"):
+        raise HTTPException(status_code=403, detail="Teacher access only.")
+    class_subjects = db.query(_CS2).filter(_CS2.teacher_id == current_user.id).all()
+    class_ids = list({cs.class_id for cs in class_subjects})
+    result = []
+    for class_id in class_ids:
+        cr = db.query(_CR2).filter(_CR2.id == class_id).first()
+        if not cr:
+            continue
+        enrollments = db.query(_SE2).filter(_SE2.class_id == class_id).all()
+        student_ids = [e.student_id for e in enrollments]
+        total_records = db.query(_AR2).filter(_AR2.class_id == class_id).count()
+        present_records = db.query(_AR2).filter(
+            _AR2.class_id == class_id, _AR2.status == "present"
+        ).count()
+        att_pct = round((present_records / total_records) * 100, 1) if total_records > 0 else 0.0
+        result.append({
+            "class_id": class_id,
+            "class_name": cr.name,
+            "student_count": len(student_ids),
+            "total_records": total_records,
+            "present_records": present_records,
+            "attendance_pct": att_pct,
+        })
+    return result
+
+
+@router.get(
+    "/teacher/class/{class_id}/parents",
+    response_model=List[TeacherParentOut],
+    tags=["Teacher"],
+    summary="Get parents of students in a specific class",
+)
+def teacher_class_parents(
+    class_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> List[TeacherParentOut]:
+    if current_user.role.name not in ("teacher", "staff", "admin"):
+        raise HTTPException(status_code=403, detail="Teacher access only.")
+    enrollments = db.query(_SE2).filter(_SE2.class_id == class_id).all()
+    cr = db.query(_CR2).filter(_CR2.id == class_id).first()
+    class_name = cr.name if cr else None
+    seen_parent_ids: set = set()
+    result = []
+    for enr in enrollments:
+        student = db.query(User).filter(User.id == enr.student_id).first()
+        if not student:
+            continue
+        for parent in student.parents:
+            if parent.id in seen_parent_ids:
+                continue
+            seen_parent_ids.add(parent.id)
+            pp = parent.parent_profile
+            result.append(TeacherParentOut(
+                id=parent.id,
+                name=parent.name,
+                email=parent.email,
+                phone=pp.phone if pp else None,
+                student_name=student.name,
+                student_class=class_name,
+            ))
+    return result
+

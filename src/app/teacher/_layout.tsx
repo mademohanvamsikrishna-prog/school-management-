@@ -11,7 +11,7 @@ export default function TeacherLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: COLORS.primary,
+        tabBarActiveTintColor: '#7C3AED',
         tabBarInactiveTintColor: COLORS.textSecondary,
         tabBarStyle: IS_WEB
           ? { display: 'none' }
@@ -23,6 +23,7 @@ export default function TeacherLayout() {
               paddingTop: 8,
             },
       }}>
+      {/* ── Visible tab-bar screens (mobile only) ── */}
       <Tabs.Screen
         name="dashboard"
         options={{
@@ -33,29 +34,29 @@ export default function TeacherLayout() {
         }}
       />
       <Tabs.Screen
-        name="classes"
+        name="students"
         options={{
-          title: 'Classes',
+          title: 'Students',
           tabBarIcon: ({ focused }) => (
-            <Text style={{ fontSize: 20, opacity: focused ? 1 : 0.6 }}>👥</Text>
+            <Text style={{ fontSize: 20, opacity: focused ? 1 : 0.6 }}>🎓</Text>
           ),
         }}
       />
       <Tabs.Screen
-        name="tasks"
+        name="attendance"
         options={{
-          title: 'Tasks',
+          title: 'Attendance',
           tabBarIcon: ({ focused }) => (
-            <Text style={{ fontSize: 20, opacity: focused ? 1 : 0.6 }}>📋</Text>
+            <Text style={{ fontSize: 20, opacity: focused ? 1 : 0.6 }}>📊</Text>
           ),
         }}
       />
       <Tabs.Screen
-        name="chat"
+        name="marks"
         options={{
-          title: 'Chat',
+          title: 'Marks',
           tabBarIcon: ({ focused }) => (
-            <Text style={{ fontSize: 20, opacity: focused ? 1 : 0.6 }}>💬</Text>
+            <Text style={{ fontSize: 20, opacity: focused ? 1 : 0.6 }}>🏆</Text>
           ),
         }}
       />
@@ -68,6 +69,13 @@ export default function TeacherLayout() {
           ),
         }}
       />
+
+      {/* ── Hidden from tab bar — accessible via sidebar ── */}
+      <Tabs.Screen name="classes"       options={{ href: null }} />
+      <Tabs.Screen name="tasks"         options={{ href: null }} />
+      <Tabs.Screen name="chat"          options={{ href: null }} />
+      <Tabs.Screen name="timetable"     options={{ href: null }} />
+      <Tabs.Screen name="notifications" options={{ href: null }} />
     </Tabs>
   );
 
