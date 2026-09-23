@@ -239,7 +239,7 @@ export default function AdminDashboard() {
         <View style={styles.welcomeBanner}>
           <View>
             <Text style={styles.welcomeGreeting}>Good morning, Principal 👋</Text>
-            <Text style={styles.welcomeSub}>Here's your school overview for today · Academic Year 2026–2027</Text>
+            <Text style={styles.welcomeSub}>Here&apos;s your school overview for today · Academic Year 2026–2027</Text>
           </View>
           <TouchableOpacity style={styles.refreshBtn} onPress={load} activeOpacity={0.8}>
             <Text style={styles.refreshText}>⟳ Refresh</Text>

@@ -320,7 +320,7 @@ export default function NotificationsScreen() {
               <View style={styles.emptyCard}>
                 <Text style={styles.emptyIcon}>🔔</Text>
                 <Text style={styles.emptyTitle}>No notifications</Text>
-                <Text style={styles.emptySub}>You're all caught up!</Text>
+                <Text style={styles.emptySub}>You&apos;re all caught up!</Text>
               </View>
             }
             renderItem={({ item }) => (

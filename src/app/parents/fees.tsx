@@ -492,8 +492,8 @@ export default function FeesScreen() {
         {filteredInvoices.length === 0 ? (
           <View style={styles.emptyCard}>
             <Text style={{ fontSize: 32, marginBottom: SIZES.sm }}>🧾</Text>
-            <Text style={styles.emptyTitle}>No invoices matching "{selectedStatusFilter}"</Text>
-            <Text style={styles.emptySub}>Select "All Invoices" to view complete billing history.</Text>
+            <Text style={styles.emptyTitle}>No invoices matching &quot;{selectedStatusFilter}&quot;</Text>
+            <Text style={styles.emptySub}>Select &quot;All Invoices&quot; to view complete billing history.</Text>
             <TouchableOpacity
               style={styles.resetFilterBtn}
               onPress={() => setSelectedStatusFilter('all')}

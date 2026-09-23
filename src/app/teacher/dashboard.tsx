@@ -182,7 +182,7 @@ export default function TeacherDashboard() {
         {/* ③ Today's Timetable */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>📅 Today's Schedule</Text>
+            <Text style={styles.sectionTitle}>📅 Today&apos;s Schedule</Text>
             <TouchableOpacity onPress={() => router.push('/teacher/timetable' as any)}>
               <Text style={styles.seeAll}>See all →</Text>
             </TouchableOpacity>

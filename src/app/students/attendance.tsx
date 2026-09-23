@@ -401,7 +401,7 @@ export default function AttendanceScreen() {
                 <View style={{ flex: 1 }}>
                   <Text style={{ fontSize: 15, fontWeight: '800', color: C.textDark }}>Keep Going!</Text>
                   <Text style={{ fontSize: 12, color: C.textSub, marginTop: 4, lineHeight: 18 }}>
-                    "Discipline today creates{'\n'}success tomorrow."
+                    &quot;Discipline today creates{'\n'}success tomorrow.&quot;
                   </Text>
                 </View>
                 <Text style={{ fontSize: 28 }}>⛰️</Text>
