@@ -29,9 +29,11 @@ class Settings(BaseSettings):
     #
     # DO NOT use "*" — it is incompatible with allow_credentials=True (CORS spec).
     CORS_ORIGINS: Union[str, List[str]] = (
-        # ── Production frontend (always allowed) ──────────────────────────
+        # ── Production frontends (always allowed) ─────────────────────────
         "https://school-management-smoky-six.vercel.app,"
         "https://school-management-git-main-mademohanvamsikrishna-8090.vercel.app,"
+        # ── Vercel preview deployments (new URL per commit) ────────────────
+        "https://school-management-e2xcjn0am-mademohanvamsikrishna-8090.vercel.app,"
         # ── Local development ─────────────────────────────────────────────
         "http://localhost:8081,"
         "http://localhost:19006,"
@@ -79,6 +81,12 @@ class Settings(BaseSettings):
         Return the parsed CORS origins list.
         In production, only explicitly configured origins are returned.
         In development/testing, localhost entries are always included for convenience.
+
+        NOTE: Vercel generates a unique preview URL for every deployment.
+        Rather than updating config.py on every deploy, set CORS_ORIGINS as a
+        Railway environment variable containing all allowed origins as a
+        comma-separated list, e.g.:
+          CORS_ORIGINS=https://school-management-smoky-six.vercel.app,https://school-management-e2xcjn0am-mademohanvamsikrishna-8090.vercel.app
         """
         origins: List[str] = (
             self.CORS_ORIGINS
