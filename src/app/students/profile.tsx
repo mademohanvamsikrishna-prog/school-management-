@@ -1,288 +1,233 @@
 /**
- * StudentProfile — full profile page.
- * Shows all student details from /profile/me.
- * Editable fields: phone number (PATCH /profile/me when backend supports it).
+ * Student Profile — Full profile page.
+ * Replaces the 3-line PlaceholderScreen.
+ *
+ * Shows: personal info, academic stats (attendance %, grade average),
+ * class & roll info, settings links, logout.
  */
 import React, { useState } from 'react';
 import {
-  View,
-  StyleSheet,
-  Text,
-  ScrollView,
-  TouchableOpacity,
-  Alert,
-  Platform,
-  SafeAreaView,
-  TextInput,
-  ActivityIndicator,
+  View, Text, StyleSheet, SafeAreaView, ScrollView,
+  TouchableOpacity, Alert, Platform, ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { COLORS, SIZES, FONTS, SHADOWS } from '../../constants/theme';
-import { useApi } from '../../hooks/useApi';
 import { useAuth } from '../../context/AuthContext';
+import { useApi } from '../../hooks/useApi';
 import { getMyProfile } from '../../services/profile';
+import { getDashboardSummary } from '../../services/dashboard';
 
-const IS_WEB = Platform.OS === 'web';
+const P = {
+  bg: '#F8FAFC', card: '#FFFFFF', border: '#E2E8F0',
+  text: '#0F172A', textSec: '#64748B', textMuted: '#94A3B8',
+  indigo: '#4F46E5', indigoBg: '#EEF2FF',
+  green: '#10B981', greenBg: '#ECFDF5',
+  amber: '#F59E0B', amberBg: '#FFFBEB',
+  red: '#EF4444', redBg: '#FEF2F2',
+};
 
-export default function ProfileScreen() {
-  const { data: profile, loading } = useApi(getMyProfile);
-  const { logout, user } = useAuth();
+const GRADE_COLORS: Record<string, { text: string; bg: string }> = {
+  'A+': { text: '#15803D', bg: '#DCFCE7' },
+  A:   { text: '#16A34A', bg: '#F0FDF4' },
+  'B+': { text: '#1D4ED8', bg: '#DBEAFE' },
+  B:   { text: '#2563EB', bg: '#EFF6FF' },
+  'C+': { text: '#D97706', bg: '#FEF3C7' },
+  C:   { text: '#D97706', bg: '#FFFBEB' },
+  D:   { text: '#DC2626', bg: '#FEE2E2' },
+  F:   { text: '#991B1B', bg: '#FEF2F2' },
+};
+
+function StatCard2({ label, value, icon, color, bg }: { label: string; value: string; icon: string; color: string; bg: string }) {
+  return (
+    <View style={[sc.card, { borderTopColor: color, borderTopWidth: 3 }]}>
+      <View style={[sc.icon, { backgroundColor: bg }]}><Text style={{ fontSize: 18 }}>{icon}</Text></View>
+      <Text style={[sc.value, { color }]}>{value}</Text>
+      <Text style={sc.label}>{label}</Text>
+    </View>
+  );
+}
+const sc = StyleSheet.create({
+  card: { flex: 1, backgroundColor: P.card, borderRadius: 14, padding: 14, borderWidth: 1, borderColor: P.border, alignItems: 'center', gap: 6 },
+  icon: { width: 40, height: 40, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
+  value: { fontSize: 20, fontWeight: '800' },
+  label: { fontSize: 11, fontWeight: '600', color: P.textSec, textAlign: 'center' },
+});
+
+function InfoRow({ label, value, icon }: { label: string; value: string; icon: string }) {
+  return (
+    <View style={s.infoRow}>
+      <View style={s.infoIcon}><Text style={{ fontSize: 16 }}>{icon}</Text></View>
+      <View>
+        <Text style={s.infoLabel}>{label}</Text>
+        <Text style={s.infoValue}>{value}</Text>
+      </View>
+    </View>
+  );
+}
+
+export default function StudentProfileScreen() {
   const router = useRouter();
-  const [editMode, setEditMode] = useState(false);
-  const [phone, setPhone] = useState('');
+  const { user, logout } = useAuth();
+  const { data: profile, loading: profileLoading } = useApi(getMyProfile);
+  const { data: summary, loading: summaryLoading } = useApi(getDashboardSummary);
+
+  const loading = profileLoading || summaryLoading;
+  const displayName = profile?.name ?? user?.name ?? 'Student';
+  const displayEmail = profile?.email ?? user?.email ?? '';
+
+  const attPct = summary?.attendance?.percentage ?? 0;
+  const rollNo = profile?.student_profile?.roll_number ?? '—';
+  const className = profile?.student_profile?.class_name ?? '—';
+  const academicYear = profile?.student_profile?.academic_year ?? '2026–2027';
 
   const handleLogout = async () => {
-    if (IS_WEB) {
-      if (window.confirm('Are you sure you want to logout?')) {
-        await logout();
-        router.replace('/');
-      }
+    const doLogout = async () => { await logout(); router.replace('/'); };
+    if (Platform.OS === 'web') {
+      if (window.confirm('Logout from your student account?')) doLogout();
     } else {
-      Alert.alert('Logout', 'Are you sure you want to logout?', [
+      Alert.alert('Logout', 'Exit your student portal?', [
         { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Logout',
-          style: 'destructive',
-          onPress: async () => {
-            await logout();
-            router.replace('/');
-          },
-        },
+        { text: 'Logout', style: 'destructive', onPress: doLogout },
       ]);
     }
   };
 
-  if (loading || !profile) {
-    return (
-      <SafeAreaView style={styles.safeArea}>
-        <View style={styles.loadingCenter}>
-          <ActivityIndicator size="large" color={COLORS.primary} />
-          <Text style={styles.loadingText}>Loading profile...</Text>
-        </View>
-      </SafeAreaView>
-    );
-  }
-
-  const sp = profile.student_profile;
-  const initial = profile.name?.[0]?.toUpperCase() ?? '?';
+  const attColor = attPct >= 75 ? P.green : attPct >= 60 ? P.amber : P.red;
+  const attBg = attPct >= 75 ? P.greenBg : attPct >= 60 ? P.amberBg : P.redBg;
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
-
-        {/* ── Header card ── */}
-        <View style={styles.heroCard}>
-          <View style={styles.avatarCircle}>
-            <Text style={styles.avatarInitial}>{initial}</Text>
-          </View>
-          <Text style={styles.heroName}>{profile.name}</Text>
-          <View style={styles.roleChip}>
-            <Text style={styles.roleText}>{profile.role.toUpperCase()}</Text>
-          </View>
-          {sp && (
-            <Text style={styles.heroSub}>
-              {sp.class_name ?? 'Class'} {sp.section ? `· Section ${sp.section}` : ''} {sp.roll_number ? `· Roll ${sp.roll_number}` : ''}
-            </Text>
-          )}
+    <SafeAreaView style={{ flex: 1, backgroundColor: P.bg }}>
+      <View style={s.header}>
+        <View>
+          <Text style={s.breadcrumb}>STUDENT / PROFILE</Text>
+          <Text style={s.title}>My Profile</Text>
         </View>
+      </View>
 
-        {/* ── Basic Info ── */}
-        <SectionCard title="Basic Information" icon="📋">
-          <InfoRow label="Full Name"         value={profile.name} />
-          <InfoRow label="Email"             value={profile.email} />
-          {sp && <>
-            <InfoRow label="Admission No."  value={sp.admission_number} />
-            <InfoRow label="Roll Number"    value={sp.roll_number} />
-            <InfoRow label="Section"        value={sp.section} />
-            <InfoRow label="Class"          value={sp.class_name ?? '—'} />
-          </>}
-        </SectionCard>
-
-        {/* ── Contact Info ── */}
-        <SectionCard title="Contact Information" icon="📞">
-          {editMode ? (
-            <View style={styles.editRow}>
-              <Text style={styles.editLabel}>Phone Number</Text>
-              <TextInput
-                style={styles.editInput}
-                value={phone}
-                onChangeText={setPhone}
-                placeholder="Enter phone number"
-                placeholderTextColor={COLORS.textLight}
-                keyboardType="phone-pad"
-              />
-              <TouchableOpacity
-                style={styles.saveBtn}
-                onPress={() => {
-                  // In a real implementation this would PATCH /profile/me
-                  setEditMode(false);
-                }}
-              >
-                <Text style={styles.saveBtnText}>Save</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => setEditMode(false)}>
-                <Text style={styles.cancelText}>Cancel</Text>
-              </TouchableOpacity>
+      {loading ? (
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <ActivityIndicator size="large" color={P.indigo} />
+        </View>
+      ) : (
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.scroll}>
+          {/* Avatar */}
+          <View style={s.avatarCard}>
+            <View style={[s.avatarCircle, { backgroundColor: P.indigo }]}>
+              <Text style={s.avatarText}>{displayName[0]?.toUpperCase()}</Text>
             </View>
-          ) : (
-            <InfoRow
-              label="Phone"
-              value={phone || 'Not provided'}
-              action={
-                <TouchableOpacity onPress={() => setEditMode(true)}>
-                  <Text style={styles.editLink}>Edit</Text>
-                </TouchableOpacity>
-              }
+            <View style={{ flex: 1 }}>
+              <Text style={s.displayName}>{displayName}</Text>
+              <View style={s.rolePill}><Text style={s.roleText}>STUDENT · {academicYear}</Text></View>
+              <Text style={s.displayEmail}>{displayEmail}</Text>
+            </View>
+          </View>
+
+          {/* Academic Stats */}
+          <View style={s.statsRow}>
+            <StatCard2
+              label="Attendance"
+              value={`${attPct}%`}
+              icon="📊"
+              color={attColor}
+              bg={attBg}
             />
+            <StatCard2
+              label="Class"
+              value={className}
+              icon="🏫"
+              color={P.indigo}
+              bg={P.indigoBg}
+            />
+            <StatCard2
+              label="Roll No."
+              value={rollNo}
+              icon="🎓"
+              color={P.amber}
+              bg={P.amberBg}
+            />
+          </View>
+
+          {/* Attendance Warning */}
+          {attPct < 75 && (
+            <View style={s.warningCard}>
+              <Text style={{ fontSize: 20 }}>⚠️</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={s.warnTitle}>Low Attendance Alert</Text>
+                <Text style={s.warnDesc}>Your attendance is {attPct}%. Minimum required is 75%.</Text>
+              </View>
+            </View>
           )}
-          <InfoRow label="Email" value={profile.email} />
-        </SectionCard>
 
-        {/* ── Account Info ── */}
-        <SectionCard title="Account" icon="🔐">
-          <InfoRow label="Account Status" value={profile.is_active ? '✅ Active' : '❌ Inactive'} />
-          <InfoRow label="Role"           value={profile.role} />
-          <InfoRow label="User ID"        value={profile.id.slice(0, 8) + '...'} />
-        </SectionCard>
+          {/* Personal Info */}
+          <View style={s.section}>
+            <Text style={s.sectionTitle}>Personal Information</Text>
+            <InfoRow label="Full Name" value={displayName} icon="👤" />
+            <InfoRow label="Email Address" value={displayEmail} icon="📧" />
+            <InfoRow label="Class" value={className} icon="🏫" />
+            <InfoRow label="Roll Number" value={rollNo} icon="🔢" />
+            <InfoRow label="Academic Year" value={academicYear} icon="📅" />
+          </View>
 
-        {/* ── Logout ── */}
-        <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-          <Text style={styles.logoutText}>🚪  Logout</Text>
-        </TouchableOpacity>
+          {/* Quick Links */}
+          <View style={s.section}>
+            <Text style={s.sectionTitle}>Quick Access</Text>
+            {[
+              { label: 'My Timetable', icon: '🗓️', route: '/students/timetable' },
+              { label: 'My Results', icon: '📊', route: '/students/results' },
+              { label: 'My Assignments', icon: '📝', route: '/students/assignments' },
+              { label: 'Leave Applications', icon: '📋', route: '/students/leave' },
+              { label: 'Study Materials', icon: '📚', route: '/students/study-materials' },
+              { label: 'Notifications', icon: '🔔', route: '/students/notifications' },
+            ].map(link => (
+              <TouchableOpacity
+                key={link.label}
+                style={s.linkRow}
+                onPress={() => router.push(link.route as any)}
+                activeOpacity={0.75}
+              >
+                <Text style={{ fontSize: 18 }}>{link.icon}</Text>
+                <Text style={s.linkLabel}>{link.label}</Text>
+                <Text style={{ color: P.textMuted, fontSize: 18 }}>›</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
 
-        <View style={{ height: SIZES.xxl }} />
-      </ScrollView>
+          {/* Logout */}
+          <TouchableOpacity style={s.logoutBtn} onPress={handleLogout} activeOpacity={0.8}>
+            <Text style={{ fontSize: 18 }}>🚪</Text>
+            <Text style={s.logoutText}>Logout</Text>
+          </TouchableOpacity>
+
+          <View style={{ height: 48 }} />
+        </ScrollView>
+      )}
     </SafeAreaView>
   );
 }
 
-// ─── Sub-components ────────────────────────────────────────────────────────────
-
-function SectionCard({ title, icon, children }: { title: string; icon: string; children: React.ReactNode }) {
-  return (
-    <View style={styles.card}>
-      <View style={styles.cardHeader}>
-        <Text style={styles.cardIcon}>{icon}</Text>
-        <Text style={styles.cardTitle}>{title}</Text>
-      </View>
-      <View style={styles.divider} />
-      {children}
-    </View>
-  );
-}
-
-function InfoRow({ label, value, action }: { label: string; value: string; action?: React.ReactNode }) {
-  return (
-    <View style={styles.infoRow}>
-      <Text style={styles.infoLabel}>{label}</Text>
-      <View style={styles.infoRight}>
-        <Text style={styles.infoValue} numberOfLines={2}>{value || '—'}</Text>
-        {action}
-      </View>
-    </View>
-  );
-}
-
-// ─── Styles ────────────────────────────────────────────────────────────────────
-
-const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#F1F5F9' },
-  loadingCenter: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: SIZES.sm },
-  loadingText: { ...FONTS.body2, color: COLORS.textSecondary },
-  container: {
-    padding: IS_WEB ? SIZES.xl : SIZES.md,
-    maxWidth: IS_WEB ? 720 : undefined,
-    alignSelf: IS_WEB ? 'center' : undefined,
-    width: '100%',
-    paddingBottom: SIZES.xxl,
-  },
-  // Hero card
-  heroCard: {
-    backgroundColor: COLORS.primary,
-    borderRadius: SIZES.radius,
-    padding: SIZES.xl,
-    alignItems: 'center',
-    marginBottom: SIZES.md,
-    ...SHADOWS.medium,
-  },
-  avatarCircle: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: 'rgba(255,255,255,0.25)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: SIZES.sm,
-    borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.5)',
-  },
-  avatarInitial: { fontSize: 30, fontWeight: '700', color: '#fff' },
-  heroName: { ...FONTS.h3, color: '#fff', fontWeight: '700', marginBottom: 6 },
-  roleChip: {
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    paddingHorizontal: SIZES.md,
-    paddingVertical: 4,
-    borderRadius: SIZES.radiusRound,
-    marginBottom: 6,
-  },
-  roleText: { fontSize: 11, fontWeight: '700', color: '#fff', letterSpacing: 1 },
-  heroSub: { ...FONTS.body2, color: 'rgba(255,255,255,0.8)', textAlign: 'center', marginTop: 4 },
-  // Cards
-  card: {
-    backgroundColor: COLORS.card,
-    borderRadius: SIZES.radius,
-    padding: SIZES.lg,
-    marginBottom: SIZES.md,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    ...SHADOWS.small,
-  },
-  cardHeader: { flexDirection: 'row', alignItems: 'center', gap: SIZES.sm, marginBottom: SIZES.sm },
-  cardIcon: { fontSize: 18 },
-  cardTitle: { ...FONTS.h4, color: COLORS.textDark },
-  divider: { height: 1, backgroundColor: COLORS.border, marginBottom: SIZES.sm },
-  // Info rows
-  infoRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F8FAFC',
-  },
-  infoLabel: { ...FONTS.body2, color: COLORS.textSecondary, flex: 1 },
-  infoRight: { flex: 1.5, flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', gap: SIZES.sm },
-  infoValue: { ...FONTS.body2, color: COLORS.textDark, fontWeight: '500', textAlign: 'right', flex: 1 },
-  editLink: { ...FONTS.body2, color: COLORS.primary, fontWeight: '600' },
-  // Edit mode
-  editRow: { gap: SIZES.sm, paddingVertical: SIZES.sm },
-  editLabel: { ...FONTS.body2, color: COLORS.textSecondary },
-  editInput: {
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    borderRadius: SIZES.radiusSm,
-    padding: SIZES.sm,
-    fontSize: 14,
-    color: COLORS.textDark,
-    backgroundColor: '#F8FAFC',
-  },
-  saveBtn: {
-    backgroundColor: COLORS.primary,
-    paddingVertical: SIZES.sm,
-    borderRadius: SIZES.radiusSm,
-    alignItems: 'center',
-  },
-  saveBtnText: { color: '#fff', fontWeight: '700', fontSize: 14 },
-  cancelText: { color: COLORS.textSecondary, textAlign: 'center', paddingVertical: SIZES.xs },
-  // Logout
-  logoutButton: {
-    backgroundColor: '#FEF2F2',
-    borderWidth: 1,
-    borderColor: '#FECACA',
-    borderRadius: SIZES.radius,
-    paddingVertical: SIZES.md,
-    alignItems: 'center',
-    marginTop: SIZES.sm,
-  },
-  logoutText: { color: COLORS.error, fontSize: 16, fontWeight: '700' },
+const s = StyleSheet.create({
+  header: { paddingHorizontal: 20, paddingVertical: 16, backgroundColor: P.card, borderBottomWidth: 1, borderBottomColor: P.border },
+  breadcrumb: { fontSize: 10, fontWeight: '700', color: P.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 },
+  title: { fontSize: 20, fontWeight: '800', color: P.text },
+  scroll: { padding: 16, gap: 14 },
+  avatarCard: { flexDirection: 'row', alignItems: 'flex-start', gap: 14, backgroundColor: P.card, borderRadius: 16, padding: 18, borderWidth: 1, borderColor: P.border, shadowColor: '#0F172A', shadowOpacity: 0.05, shadowOffset: { width: 0, height: 2 }, shadowRadius: 6, elevation: 2 },
+  avatarCircle: { width: 68, height: 68, borderRadius: 34, justifyContent: 'center', alignItems: 'center' },
+  avatarText: { color: '#FFF', fontSize: 28, fontWeight: '800' },
+  displayName: { fontSize: 19, fontWeight: '800', color: P.text, marginBottom: 4 },
+  displayEmail: { fontSize: 12, color: P.textSec, marginTop: 4 },
+  rolePill: { alignSelf: 'flex-start', backgroundColor: P.indigoBg, paddingHorizontal: 10, paddingVertical: 3, borderRadius: 20 },
+  roleText: { fontSize: 9, fontWeight: '800', color: P.indigo },
+  statsRow: { flexDirection: 'row', gap: 10 },
+  warningCard: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#FFFBEB', borderRadius: 14, padding: 14, borderWidth: 1, borderColor: '#FDE68A' },
+  warnTitle: { fontSize: 13, fontWeight: '700', color: '#92400E', marginBottom: 2 },
+  warnDesc: { fontSize: 12, color: '#D97706' },
+  section: { backgroundColor: P.card, borderRadius: 16, padding: 16, borderWidth: 1, borderColor: P.border },
+  sectionTitle: { fontSize: 15, fontWeight: '700', color: P.text, marginBottom: 12 },
+  infoRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#F8FAFC' },
+  infoIcon: { width: 34, height: 34, borderRadius: 10, backgroundColor: P.bg, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: P.border },
+  infoLabel: { fontSize: 10, fontWeight: '600', color: P.textMuted, marginBottom: 1 },
+  infoValue: { fontSize: 14, fontWeight: '600', color: P.text },
+  linkRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 13, borderBottomWidth: 1, borderBottomColor: '#F8FAFC' },
+  linkLabel: { flex: 1, fontSize: 14, fontWeight: '600', color: P.text },
+  logoutBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, backgroundColor: P.redBg, borderRadius: 14, padding: 15, borderWidth: 1, borderColor: '#FECACA' },
+  logoutText: { fontSize: 15, fontWeight: '700', color: P.red },
 });

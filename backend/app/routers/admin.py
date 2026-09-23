@@ -1,5 +1,5 @@
 """
-Admin router — user management, class/subject management, role assignment.
+Admin router — user management, class/subject management, role assignment, and global analytics.
 Mounted under /api/v1/admin/...
 
 Requires: users:manage or classes:manage permissions.
@@ -8,12 +8,16 @@ Admin role has wildcard bypass.
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 from pydantic import BaseModel, EmailStr, Field
 
 from app.core.dependencies import get_current_user, require_permission
 from app.db.session import get_db
-from app.models.user import User, Role, Permission
+from app.models.user import User, Role, Permission, parent_students
 from app.models.academic import ClassRoom, Subject, ClassSubject, StudentEnrollment
+from app.models.attendance import AttendanceRecord
+from app.models.marks import MarkRecord, ExamSubject, Exam
+from app.models.finance import FeeInvoice, PaymentRecord
 from app.repositories import user_repository
 from app.core.security import get_password_hash
 
@@ -26,7 +30,7 @@ router = APIRouter(prefix="/admin", tags=["Admin"])
 
 class UserCreateIn(BaseModel):
     email: EmailStr
-    password: str = Field(min_length=8)
+    password: str = Field(min_length=6)
     name: str = Field(min_length=1, max_length=150)
     role_id: str
     is_active: bool = True
@@ -60,6 +64,9 @@ class ClassOut(BaseModel):
     section: str
     room_number: Optional[str] = None
     capacity: int
+    class_teacher_id: Optional[str] = None
+    teacher_name: Optional[str] = None
+    student_count: int = 0
     model_config = {"from_attributes": True}
 
 class ClassCreateIn(BaseModel):
@@ -69,6 +76,9 @@ class ClassCreateIn(BaseModel):
     room_number: Optional[str] = None
     capacity: int = 40
     class_teacher_id: Optional[str] = None
+
+class AssignTeacherIn(BaseModel):
+    teacher_id: str
 
 class SubjectOut(BaseModel):
     id: str
@@ -87,6 +97,101 @@ class EnrollmentIn(BaseModel):
     class_id: str
     academic_year: str = "2026-2027"
     roll_number: str
+
+# Analytics schemas
+class MarksOverviewItem(BaseModel):
+    student_id: str
+    student_name: str
+    subject: str
+    exam_name: str
+    marks_obtained: float
+    max_marks: float
+    grade: str
+
+class AttendanceOverviewItem(BaseModel):
+    student_id: str
+    student_name: str
+    date: str
+    status: str
+    class_name: str
+
+class FeeOverviewItem(BaseModel):
+    student_id: str
+    student_name: str
+    title: str
+    amount: float
+    due_date: str
+    status: str
+
+class AnalyticsOverview(BaseModel):
+    enrollment: dict
+    attendance: dict
+    finance: dict
+
+
+# ---------------------------------------------------------------------------
+# Helper
+# ---------------------------------------------------------------------------
+
+def _build_class_out(cls: ClassRoom, db: Session) -> ClassOut:
+    teacher_name = None
+    if cls.class_teacher_id:
+        teacher = db.query(User).filter(User.id == cls.class_teacher_id).first()
+        if teacher:
+            teacher_name = teacher.name
+    student_count = db.query(StudentEnrollment).filter(StudentEnrollment.class_id == cls.id).count()
+    return ClassOut(
+        id=cls.id,
+        name=cls.name,
+        grade_level=cls.grade_level,
+        section=cls.section,
+        room_number=cls.room_number,
+        capacity=cls.capacity,
+        class_teacher_id=cls.class_teacher_id,
+        teacher_name=teacher_name,
+        student_count=student_count,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Analytics Overview (reused by frontend dashboard)
+# ---------------------------------------------------------------------------
+
+@router.get("/analytics/overview", tags=["Admin Analytics"], summary="School-wide analytics overview")
+def analytics_overview(
+    _: User = Depends(require_permission("users:read")),
+    db: Session = Depends(get_db),
+) -> dict:
+    student_role = db.query(Role).filter(Role.name == "student").first()
+    teacher_role = db.query(Role).filter(Role.name == "teacher").first()
+    parent_role = db.query(Role).filter(Role.name == "parent").first()
+
+    students = db.query(User).filter(User.role_id == student_role.id, User.is_active == True).count() if student_role else 0
+    teachers = db.query(User).filter(User.role_id == teacher_role.id, User.is_active == True).count() if teacher_role else 0
+    parents = db.query(User).filter(User.role_id == parent_role.id, User.is_active == True).count() if parent_role else 0
+    classes = db.query(ClassRoom).count()
+
+    total_att = db.query(AttendanceRecord).count()
+    present_att = db.query(AttendanceRecord).filter(AttendanceRecord.status == "present").count()
+    att_pct = round((present_att / total_att * 100), 1) if total_att > 0 else 0.0
+
+    invoices = db.query(FeeInvoice).all()
+    total_invoiced = sum(inv.amount for inv in invoices)
+    paid_invoices = [inv for inv in invoices if inv.status == "paid"]
+    total_collected = sum(inv.amount for inv in paid_invoices)
+    total_outstanding = total_invoiced - total_collected
+    collection_rate = round((total_collected / total_invoiced * 100), 1) if total_invoiced > 0 else 0.0
+
+    return {
+        "enrollment": {"students": students, "teachers": teachers, "parents": parents, "classes": classes},
+        "attendance": {"total_records": total_att, "present_records": present_att, "overall_percentage": att_pct},
+        "finance": {
+            "total_invoiced": total_invoiced,
+            "total_collected": total_collected,
+            "total_outstanding": total_outstanding,
+            "collection_rate": collection_rate,
+        },
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -139,7 +244,8 @@ def create_user(
                    is_active=user.is_active, role_name=user.role.name)
 
 
-@router.patch("/users/{user_id}", response_model=UserOut, summary="Update user")
+@router.put("/users/{user_id}", response_model=UserOut, summary="Update user (PUT)")
+@router.patch("/users/{user_id}", response_model=UserOut, summary="Update user (PATCH)")
 def update_user(
     user_id: str,
     payload: UserUpdateIn,
@@ -200,7 +306,8 @@ def list_classes(
     _: User = Depends(require_permission("classes:read")),
     db: Session = Depends(get_db),
 ) -> List[ClassOut]:
-    return db.query(ClassRoom).order_by(ClassRoom.grade_level, ClassRoom.section).all()
+    classes = db.query(ClassRoom).order_by(ClassRoom.grade_level, ClassRoom.section).all()
+    return [_build_class_out(cls, db) for cls in classes]
 
 
 @router.post("/classes", response_model=ClassOut, status_code=201, summary="Create class")
@@ -213,7 +320,7 @@ def create_class(
     db.add(cls)
     db.commit()
     db.refresh(cls)
-    return cls
+    return _build_class_out(cls, db)
 
 
 @router.patch("/classes/{class_id}", response_model=ClassOut, summary="Update class")
@@ -230,7 +337,30 @@ def update_class(
         setattr(cls, k, v)
     db.commit()
     db.refresh(cls)
-    return cls
+    return _build_class_out(cls, db)
+
+
+@router.put("/classes/{class_id}/assign-teacher", response_model=ClassOut, summary="Assign or reassign class teacher")
+def assign_class_teacher(
+    class_id: str,
+    payload: AssignTeacherIn,
+    _: User = Depends(require_permission("classes:manage")),
+    db: Session = Depends(get_db),
+) -> ClassOut:
+    cls = db.query(ClassRoom).filter(ClassRoom.id == class_id).first()
+    if not cls:
+        raise HTTPException(status_code=404, detail="Class not found.")
+    teacher = db.query(User).filter(User.id == payload.teacher_id).first()
+    if not teacher:
+        raise HTTPException(status_code=404, detail="Teacher not found.")
+    cls.class_teacher_id = payload.teacher_id
+    # Update teacher profile
+    if teacher.teacher_profile:
+        teacher.teacher_profile.is_class_teacher = True
+        teacher.teacher_profile.class_teacher_of_class_id = class_id
+    db.commit()
+    db.refresh(cls)
+    return _build_class_out(cls, db)
 
 
 @router.delete("/classes/{class_id}", status_code=204, summary="Delete class")
@@ -252,7 +382,7 @@ def delete_class(
 
 @router.get("/subjects", response_model=List[SubjectOut], summary="List subjects")
 def list_subjects(
-    _: User = Depends(require_permission("subjects:read")),
+    _: User = Depends(require_permission("classes:read")),
     db: Session = Depends(get_db),
 ) -> List[SubjectOut]:
     return db.query(Subject).order_by(Subject.name).all()
@@ -261,7 +391,7 @@ def list_subjects(
 @router.post("/subjects", response_model=SubjectOut, status_code=201, summary="Create subject")
 def create_subject(
     payload: SubjectCreateIn,
-    _: User = Depends(require_permission("subjects:manage")),
+    _: User = Depends(require_permission("classes:manage")),
     db: Session = Depends(get_db),
 ) -> SubjectOut:
     existing = db.query(Subject).filter(Subject.code == payload.code).first()
@@ -319,3 +449,124 @@ def class_students(
         {"id": e.student_id, "name": e.student.name, "roll_number": e.roll_number}
         for e in enrollments if e.student
     ]
+
+
+# ---------------------------------------------------------------------------
+# Global Academic & Fee Oversight
+# ---------------------------------------------------------------------------
+
+@router.get("/academics/marks", summary="Global marks overview (all classes)")
+def admin_marks_overview(
+    limit: int = Query(100, ge=1, le=500),
+    offset: int = Query(0, ge=0),
+    _: User = Depends(require_permission("marks:read")),
+    db: Session = Depends(get_db),
+) -> List[dict]:
+    records = (
+        db.query(MarkRecord)
+        .offset(offset)
+        .limit(limit)
+        .all()
+    )
+    result = []
+    for r in records:
+        student = db.query(User).filter(User.id == r.student_id).first()
+        es = db.query(ExamSubject).filter(ExamSubject.id == r.exam_subject_id).first()
+        exam = db.query(Exam).filter(Exam.id == es.exam_id).first() if es else None
+        result.append({
+            "id": r.id,
+            "student_id": r.student_id,
+            "student_name": student.name if student else "Unknown",
+            "subject": es.subject.name if es and es.subject else "Unknown",
+            "exam_name": exam.name if exam else "Unknown",
+            "marks_obtained": r.marks_obtained,
+            "max_marks": es.max_marks if es else 100.0,
+            "grade": r.grade,
+        })
+    return result
+
+
+@router.get("/academics/attendance", summary="School-wide attendance metrics")
+def admin_attendance_overview(
+    limit: int = Query(100, ge=1, le=500),
+    offset: int = Query(0, ge=0),
+    _: User = Depends(require_permission("attendance:read")),
+    db: Session = Depends(get_db),
+) -> dict:
+    total = db.query(AttendanceRecord).count()
+    present = db.query(AttendanceRecord).filter(AttendanceRecord.status == "present").count()
+    absent = db.query(AttendanceRecord).filter(AttendanceRecord.status == "absent").count()
+    late = db.query(AttendanceRecord).filter(AttendanceRecord.status == "late").count()
+    pct = round((present / total * 100), 1) if total > 0 else 0.0
+
+    recent = (
+        db.query(AttendanceRecord)
+        .order_by(AttendanceRecord.date.desc())
+        .offset(offset)
+        .limit(limit)
+        .all()
+    )
+    records = []
+    for r in recent:
+        student = db.query(User).filter(User.id == r.student_id).first()
+        cls = db.query(ClassRoom).filter(ClassRoom.id == r.class_id).first()
+        records.append({
+            "id": r.id,
+            "student_id": r.student_id,
+            "student_name": student.name if student else "Unknown",
+            "date": r.date,
+            "status": r.status,
+            "class_name": cls.name if cls else "Unknown",
+        })
+
+    return {
+        "summary": {"total": total, "present": present, "absent": absent, "late": late, "attendance_rate": pct},
+        "records": records,
+    }
+
+
+@router.get("/finance/fees", summary="Fee dues and payment collection status")
+def admin_fees_overview(
+    status_filter: Optional[str] = Query(None, description="paid | pending | overdue"),
+    limit: int = Query(100, ge=1, le=500),
+    offset: int = Query(0, ge=0),
+    _: User = Depends(require_permission("finance:read")),
+    db: Session = Depends(get_db),
+) -> dict:
+    q = db.query(FeeInvoice)
+    if status_filter:
+        q = q.filter(FeeInvoice.status == status_filter)
+    invoices = q.offset(offset).limit(limit).all()
+
+    all_invoices = db.query(FeeInvoice).all()
+    total_amount = sum(inv.amount for inv in all_invoices)
+    paid_amount = sum(inv.amount for inv in all_invoices if inv.status == "paid")
+    pending_amount = sum(inv.amount for inv in all_invoices if inv.status == "pending")
+    overdue_amount = sum(inv.amount for inv in all_invoices if inv.status == "overdue")
+    collection_rate = round((paid_amount / total_amount * 100), 1) if total_amount > 0 else 0.0
+
+    items = []
+    for inv in invoices:
+        student = db.query(User).filter(User.id == inv.student_id).first()
+        items.append({
+            "id": inv.id,
+            "student_id": inv.student_id,
+            "student_name": student.name if student else "Unknown",
+            "title": inv.title,
+            "amount": inv.amount,
+            "due_date": inv.due_date,
+            "status": inv.status,
+        })
+
+    return {
+        "summary": {
+            "total_invoiced": total_amount,
+            "total_collected": paid_amount,
+            "total_pending": pending_amount,
+            "total_overdue": overdue_amount,
+            "collection_rate": collection_rate,
+            "total_invoices": len(all_invoices),
+        },
+        "invoices": items,
+    }
+

@@ -26,7 +26,8 @@ import { ChildAvatar } from '../../components/ChildAvatar';
 import { LoadingScreen, ErrorScreen } from '../../components/ScreenStates';
 import { COLORS, SIZES, FONTS, SHADOWS } from '../../constants/theme';
 import { useApi } from '../../hooks/useApi';
-import { getMyProfile } from '../../services/profile';
+import { useParentChild } from '../../context/ParentChildContext';
+import { Student } from '../../types/models';
 import { getStudentInvoices, simulatePayment, FeeInvoice } from '../../services/finance';
 
 const IS_WEB = Platform.OS === 'web';
@@ -40,19 +41,47 @@ interface EnrichedInvoice extends FeeInvoice {
 }
 
 export default function FeesScreen() {
-  const { data: profile, loading: profileLoading, error: profileError, refetch: refetchProfile } = useApi(getMyProfile);
-  const children = profile?.parent_profile?.children || [];
+  // ── Use shared parent-child context (synced with sidebar & other parent pages)
+  const {
+    children: contextChildren,
+    selectedChildId,
+    setSelectedChildId,
+    activeChild: contextActiveChild,
+    isLoading: contextLoading,
+  } = useParentChild();
 
-  const [selectedChildId, setSelectedChildId] = useState<string | null>(null);
+  // Map ChildInfo → profile-compatible shape
+  const children = contextChildren.map((c) => ({
+    id: c.id,
+    name: c.name,
+    email: c.email || '',
+    avatar_url: c.avatar_url,
+    student_profile: {
+      roll_number: c.roll_number || '',
+      admission_number: c.admission_number || '',
+      section: c.section || '',
+      class_name: c.className || '',
+    },
+  }));
+
+  const activeChild = contextActiveChild
+    ? {
+        id: contextActiveChild.id,
+        name: contextActiveChild.name,
+        email: contextActiveChild.email || '',
+        avatar_url: contextActiveChild.avatar_url,
+        student_profile: {
+          roll_number: contextActiveChild.roll_number || '',
+          admission_number: contextActiveChild.admission_number || '',
+          section: contextActiveChild.section || '',
+          class_name: contextActiveChild.className || '',
+        },
+      }
+    : children[0] ?? null;
+
   const [selectedStatusFilter, setSelectedStatusFilter] = useState<'all' | 'pending' | 'paid' | 'overdue'>('all');
   const [payingInvoiceId, setPayingInvoiceId] = useState<string | null>(null);
   const [paidLocalIds, setPaidLocalIds] = useState<Set<string>>(new Set());
-
-  if (children.length > 0 && !selectedChildId) {
-    setSelectedChildId(children[0].id);
-  }
-
-  const activeChild = children.find(c => c.id === selectedChildId) || (children.length > 0 ? children[0] : null);
 
   const {
     data: rawInvoices,
@@ -300,14 +329,14 @@ export default function FeesScreen() {
     }
   };
 
-  const loading = profileLoading || (invoicesLoading && !rawInvoices);
+  const loading = contextLoading || (invoicesLoading && !rawInvoices);
 
-  if (loading && !profile) {
+  if (loading && children.length === 0 && contextLoading) {
     return <LoadingScreen message="Loading fee statements & invoices..." />;
   }
 
-  if (profileError) {
-    return <ErrorScreen error={profileError} onRetry={refetchProfile} />;
+  if (!contextLoading && children.length === 0) {
+    return <ErrorScreen error="No children found for this account." onRetry={() => {}} />;
   }
 
   return (

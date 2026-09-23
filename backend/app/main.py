@@ -38,6 +38,7 @@ from app.routers import admin as admin_router
 from app.routers import chat as chat_router
 from app.routers import extended as extended_router
 from app.routers import student_dashboard as student_dashboard_router
+from app.routers import teacher as teacher_router  # NEW: teacher-specific endpoints
 
 api_v1_router = APIRouter(prefix="/api/v1")
 api_v1_router.include_router(auth_router.router)
@@ -46,6 +47,7 @@ api_v1_router.include_router(admin_router.router)
 api_v1_router.include_router(chat_router.router)
 api_v1_router.include_router(extended_router.router)
 api_v1_router.include_router(student_dashboard_router.router)
+api_v1_router.include_router(teacher_router.router)  # NEW
 
 # ---------------------------------------------------------------------------
 # Startup / shutdown lifecycle
@@ -71,7 +73,7 @@ async def lifespan(app: FastAPI):
 
     # Run incremental seed: ensure all data exists in DB
     try:
-        from app.db.seed import seed_database, ensure_seed_invoices, seed_dhanush_family, seed_telugu_class_9c
+        from app.db.seed import seed_database, ensure_seed_invoices, seed_dhanush_family, seed_telugu_class_9c, seed_requested_users
         from app.db.session import SessionLocal as _SL
         _db = _SL()
         try:
@@ -79,6 +81,7 @@ async def lifespan(app: FastAPI):
             ensure_seed_invoices(_db)
             seed_dhanush_family(_db)
             seed_telugu_class_9c(_db)
+            seed_requested_users(_db)
         finally:
             _db.close()
     except Exception as _seed_err:

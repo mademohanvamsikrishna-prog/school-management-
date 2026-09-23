@@ -963,6 +963,296 @@ def seed_telugu_class_9c(db: Session) -> None:
     print("  Sreeja, Vamsi, Revathi, Prasanth, Anusha, Karthik, Divya, Rohit, Meghana, Suresh")
 
 
+def seed_requested_users(db: Session) -> None:
+    """
+    Seeds the specific user accounts requested in the mission brief:
+      - principal@school.com  / admin123   (Principal / Admin)
+      - sharma@school.com     / teacher123 (Mrs. Sharma — Class 10-A, Physics)
+      - verma@school.com      / teacher123 (Mr. Verma  — Class 8-B, Mathematics)
+      - dhanush@school.com    / parent123  (Parent Dhanush)
+      - charitha@school.com   / student123 (Student Charitha, Class 10-A, Roll 101)
+      - rajesh@school.com     / student123 (Student Rajesh,   Class 8-B,  Roll 204)
+
+    Idempotent — guarded by email check on principal@school.com.
+    """
+    if db.query(User).filter(User.email == "principal@school.com").first():
+        print("[INFO] Requested users already seeded. Skipping.")
+        return
+
+    print("[INFO] Seeding requested users (principal, sharma, verma, dhanush, charitha, rajesh)...")
+
+    # ── Resolve roles ──────────────────────────────────────────────────────────
+    role_admin   = db.query(Role).filter(Role.name == "admin").first()
+    role_teacher = db.query(Role).filter(Role.name == "teacher").first()
+    role_student = db.query(Role).filter(Role.name == "student").first()
+    role_parent  = db.query(Role).filter(Role.name == "parent").first()
+    if not all([role_admin, role_teacher, role_student, role_parent]):
+        print("[WARNING] Roles not found — run seed_database() first.")
+        return
+
+    # ── Resolve / create Class 10-A ──────────────────────────────────────────
+    class_10a = db.query(ClassRoom).filter(ClassRoom.name == "Class 10 - A").first()
+    if not class_10a:
+        class_10a = ClassRoom(name="Class 10 - A", grade_level=10, section="A", room_number="Room 204", capacity=40)
+        db.add(class_10a)
+        db.flush()
+
+    # ── Resolve / create Class 8-B ──────────────────────────────────────────
+    class_8b = db.query(ClassRoom).filter(ClassRoom.name == "Class 8 - B").first()
+    if not class_8b:
+        class_8b = ClassRoom(name="Class 8 - B", grade_level=8, section="B", room_number="Room 108", capacity=40)
+        db.add(class_8b)
+        db.flush()
+
+    # ── Subjects ──────────────────────────────────────────────────────────────
+    sub_physics = db.query(Subject).filter(Subject.code == "PHY101").first()
+    if not sub_physics:
+        sub_physics = Subject(name="Physics", code="PHY101", department="Science")
+        db.add(sub_physics)
+
+    sub_math = db.query(Subject).filter(Subject.code == "MATH101").first()
+    if not sub_math:
+        sub_math = Subject(name="Mathematics", code="MATH101", department="Mathematics")
+        db.add(sub_math)
+    db.flush()
+
+    # ── Principal ─────────────────────────────────────────────────────────────
+    principal = User(
+        email="principal@school.com",
+        hashed_password=get_password_hash("admin123"),
+        name="Principal",
+        role_id=role_admin.id,
+        avatar_url="https://i.pravatar.cc/150?u=principal_school",
+    )
+    db.add(principal)
+
+    # ── Mrs. Sharma (teacher, Class 10-A, Physics) ────────────────────────────
+    sharma = User(
+        email="sharma@school.com",
+        hashed_password=get_password_hash("teacher123"),
+        name="Mrs. Sharma",
+        role_id=role_teacher.id,
+        avatar_url="https://i.pravatar.cc/150?u=sharma_school",
+    )
+    sharma.teacher_profile = TeacherProfile(
+        employee_id="TCH-2001",
+        department="Physics",
+        qualification="M.Sc. Physics, B.Ed.",
+        is_class_teacher=True,
+        class_teacher_of_class_id=class_10a.id,
+    )
+    db.add(sharma)
+
+    # ── Mr. Verma (teacher, Class 8-B, Mathematics) ────────────────────────────
+    verma = User(
+        email="verma@school.com",
+        hashed_password=get_password_hash("teacher123"),
+        name="Mr. Verma",
+        role_id=role_teacher.id,
+        avatar_url="https://i.pravatar.cc/150?u=verma_school",
+    )
+    verma.teacher_profile = TeacherProfile(
+        employee_id="TCH-2002",
+        department="Mathematics",
+        qualification="M.Sc. Mathematics, B.Ed.",
+        is_class_teacher=True,
+        class_teacher_of_class_id=class_8b.id,
+    )
+    db.add(verma)
+    db.flush()
+
+    # Assign teachers to classes
+    class_10a.class_teacher_id = sharma.id
+    class_8b.class_teacher_id = verma.id
+
+    # ── ClassSubjects ─────────────────────────────────────────────────────────
+    existing_cs = db.query(ClassSubject).filter(
+        ClassSubject.class_id == class_10a.id,
+        ClassSubject.subject_id == sub_physics.id,
+    ).first()
+    if not existing_cs:
+        db.add(ClassSubject(class_id=class_10a.id, subject_id=sub_physics.id, teacher_id=sharma.id))
+
+    existing_cs2 = db.query(ClassSubject).filter(
+        ClassSubject.class_id == class_8b.id,
+        ClassSubject.subject_id == sub_math.id,
+    ).first()
+    if not existing_cs2:
+        db.add(ClassSubject(class_id=class_8b.id, subject_id=sub_math.id, teacher_id=verma.id))
+    db.flush()
+
+    # ── Charitha (student, Class 10-A, Roll 101) ───────────────────────────────
+    charitha = User(
+        email="charitha@school.com",
+        hashed_password=get_password_hash("student123"),
+        name="Charitha",
+        role_id=role_student.id,
+        avatar_url="https://i.pravatar.cc/150?u=charitha_school",
+    )
+    charitha.student_profile = StudentProfile(
+        roll_number="101",
+        admission_number="ADM-2025-0101",
+        section="A",
+        date_of_birth="2009-07-22",
+        gender="Female",
+        blood_group="A+",
+        current_class_id=class_10a.id,
+    )
+    db.add(charitha)
+
+    # ── Rajesh (student, Class 8-B, Roll 204) ─────────────────────────────────
+    rajesh = User(
+        email="rajesh@school.com",
+        hashed_password=get_password_hash("student123"),
+        name="Rajesh",
+        role_id=role_student.id,
+        avatar_url="https://i.pravatar.cc/150?u=rajesh_school",
+    )
+    rajesh.student_profile = StudentProfile(
+        roll_number="204",
+        admission_number="ADM-2025-0204",
+        section="B",
+        date_of_birth="2012-11-05",
+        gender="Male",
+        blood_group="O+",
+        current_class_id=class_8b.id,
+    )
+    db.add(rajesh)
+
+    # ── Dhanush (parent of Charitha + Rajesh) ─────────────────────────────────
+    dhanush = User(
+        email="dhanush@school.com",
+        hashed_password=get_password_hash("parent123"),
+        name="Dhanush",
+        role_id=role_parent.id,
+        avatar_url="https://i.pravatar.cc/150?u=dhanush_school",
+    )
+    dhanush.parent_profile = ParentProfile(
+        phone="+91 99887 66554",
+        alternate_phone="+91 99887 66555",
+        occupation="Business Owner",
+        address="Plot 12, Banjara Hills, Hyderabad",
+    )
+    dhanush.children.append(charitha)
+    dhanush.children.append(rajesh)
+    db.add(dhanush)
+    db.flush()
+
+    # ── Enrollments ──────────────────────────────────────────────────────────
+    # Guard against duplicate enrollment (unique constraint: student_id + academic_year)
+    existing_enr_c = db.query(StudentEnrollment).filter(
+        StudentEnrollment.student_id == charitha.id,
+        StudentEnrollment.academic_year == "2026-2027",
+    ).first()
+    if not existing_enr_c:
+        db.add(StudentEnrollment(student_id=charitha.id, class_id=class_10a.id, roll_number="101", academic_year="2026-2027"))
+
+    existing_enr_r = db.query(StudentEnrollment).filter(
+        StudentEnrollment.student_id == rajesh.id,
+        StudentEnrollment.academic_year == "2026-2027",
+    ).first()
+    if not existing_enr_r:
+        db.add(StudentEnrollment(student_id=rajesh.id, class_id=class_8b.id, roll_number="204", academic_year="2026-2027"))
+    db.flush()
+
+    # ── Attendance: 20 days ───────────────────────────────────────────────────
+    today = datetime.now(timezone.utc).date()
+    for i in range(20):
+        past_date = (today - timedelta(days=i)).strftime("%Y-%m-%d")
+        charitha_status = "absent" if i in (3, 9) else "present"
+        existing_att_c = db.query(AttendanceRecord).filter(
+            AttendanceRecord.student_id == charitha.id,
+            AttendanceRecord.date == past_date,
+        ).first()
+        if not existing_att_c:
+            db.add(AttendanceRecord(
+                student_id=charitha.id,
+                class_id=class_10a.id,
+                date=past_date,
+                status=charitha_status,
+                recorded_by_teacher_id=sharma.id,
+            ))
+        rajesh_status = "absent" if i == 6 else "present"
+        existing_att_r = db.query(AttendanceRecord).filter(
+            AttendanceRecord.student_id == rajesh.id,
+            AttendanceRecord.date == past_date,
+        ).first()
+        if not existing_att_r:
+            db.add(AttendanceRecord(
+                student_id=rajesh.id,
+                class_id=class_8b.id,
+                date=past_date,
+                status=rajesh_status,
+                recorded_by_teacher_id=verma.id,
+            ))
+    db.flush()
+
+    # ── Exams & Marks ─────────────────────────────────────────────────────────
+    # Reuse or create exam for Charitha (Class 10-A / Physics)
+    exam_sharma = Exam(
+        name="Mid-Term 2026 — Class 10A",
+        term="Term 1",
+        academic_year="2026-2027",
+        start_date="2026-09-15",
+        end_date="2026-09-25",
+        status="completed",
+    )
+    db.add(exam_sharma)
+    db.flush()
+
+    es_phy = ExamSubject(exam_id=exam_sharma.id, class_id=class_10a.id, subject_id=sub_physics.id, max_marks=100.0, passing_marks=35.0, exam_date="2026-09-16")
+    db.add(es_phy)
+    db.flush()
+    db.add(MarkRecord(exam_subject_id=es_phy.id, student_id=charitha.id, marks_obtained=89.0, grade="A+", remarks="Outstanding work in Physics", entered_by_teacher_id=sharma.id))
+
+    # Exam for Rajesh (Class 8-B / Mathematics)
+    exam_verma = Exam(
+        name="Mid-Term 2026 — Class 8B",
+        term="Term 1",
+        academic_year="2026-2027",
+        start_date="2026-09-15",
+        end_date="2026-09-25",
+        status="completed",
+    )
+    db.add(exam_verma)
+    db.flush()
+
+    es_math_8b = ExamSubject(exam_id=exam_verma.id, class_id=class_8b.id, subject_id=sub_math.id, max_marks=100.0, passing_marks=35.0, exam_date="2026-09-17")
+    db.add(es_math_8b)
+    db.flush()
+    db.add(MarkRecord(exam_subject_id=es_math_8b.id, student_id=rajesh.id, marks_obtained=76.0, grade="B+", remarks="Good understanding of concepts", entered_by_teacher_id=verma.id))
+    db.flush()
+
+    # ── Fee Invoices ──────────────────────────────────────────────────────────
+    cat_tuition = db.query(FeeCategory).filter(FeeCategory.name == "Tuition Fee").first()
+    if not cat_tuition:
+        cat_tuition = FeeCategory(name="Tuition Fee", description="Quarterly academic tuition fees")
+        db.add(cat_tuition)
+        db.flush()
+
+    # Charitha: 1 Paid, 1 Pending
+    inv_c_paid = FeeInvoice(student_id=charitha.id, category_id=cat_tuition.id, title="Tuition Fee - Term 1", amount=15000.0, due_date="2026-08-15", status="paid")
+    inv_c_pending = FeeInvoice(student_id=charitha.id, category_id=cat_tuition.id, title="Tuition Fee - Term 2", amount=15000.0, due_date="2026-12-15", status="pending")
+    db.add_all([inv_c_paid, inv_c_pending])
+    db.flush()
+    db.add(PaymentRecord(invoice_id=inv_c_paid.id, amount_paid=15000.0, payment_method="simulated_sandbox", transaction_reference="TXN-REQ-C001", status="success"))
+
+    # Rajesh: 1 Paid, 1 Pending
+    inv_r_paid = FeeInvoice(student_id=rajesh.id, category_id=cat_tuition.id, title="Tuition Fee - Term 1", amount=12000.0, due_date="2026-08-15", status="paid")
+    inv_r_pending = FeeInvoice(student_id=rajesh.id, category_id=cat_tuition.id, title="Tuition Fee - Term 2", amount=12000.0, due_date="2026-12-15", status="pending")
+    db.add_all([inv_r_paid, inv_r_pending])
+    db.flush()
+    db.add(PaymentRecord(invoice_id=inv_r_paid.id, amount_paid=12000.0, payment_method="simulated_sandbox", transaction_reference="TXN-REQ-R001", status="success"))
+
+    # ── Notifications ─────────────────────────────────────────────────────────
+    db.add(Notification(user_id=dhanush.id, title="Welcome, Dhanush!", body="You are linked to Charitha and Rajesh. View their academic progress from your dashboard.", type="info"))
+    db.add(Notification(user_id=charitha.id, title="Welcome, Charitha!", body="Your school portal is ready. Check your timetable and results.", type="info"))
+    db.add(Notification(user_id=rajesh.id, title="Welcome, Rajesh!", body="Your school portal is ready. Check your timetable and schedule.", type="info"))
+
+    db.commit()
+    print("[SUCCESS] Requested users seeded: principal@school.com, sharma@school.com, verma@school.com, dhanush@school.com, charitha@school.com, rajesh@school.com")
+
+
 if __name__ == "__main__":
     db = SessionLocal()
     try:
@@ -970,6 +1260,7 @@ if __name__ == "__main__":
         ensure_seed_invoices(db)
         seed_dhanush_family(db)
         seed_telugu_class_9c(db)
+        seed_requested_users(db)
     finally:
         db.close()
 
