@@ -3,6 +3,9 @@
   "outputDirectory": "dist",
   "installCommand": "npm install",
   "framework": null,
+  "env": {
+    "EXPO_PUBLIC_API_BASE_URL": "https://school-management-production-1d29.up.railway.app/api/v1"
+  },
   "rewrites": [
     { "source": "/(.*)", "destination": "/index.html" }
   ],
