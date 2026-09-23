@@ -51,11 +51,10 @@ const C = {
 // ─── API helpers ──────────────────────────────────────────────────────────────
 async function fetchTodayTimetable(userId: string | undefined, day: number) {
   if (!userId) return [];
-  const res = await apiClient.get(`/timetable/teacher/${userId}?day=${day}`);
-  return res.data as any[];
+  return await apiClient.get<any[]>(`/timetable/teacher/${userId}?day=${day}`);
 }
-async function fetchClasses()  { return (await apiClient.get('/teacher/me/classes')).data as any[]; }
-async function fetchAttStats() { return (await apiClient.get('/teacher/me/attendance/stats')).data as any[]; }
+async function fetchClasses()  { return await apiClient.get<any[]>('/teacher/me/classes'); }
+async function fetchAttStats() { return await apiClient.get<any[]>('/teacher/me/attendance/stats'); }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function formatTime(t: string) {

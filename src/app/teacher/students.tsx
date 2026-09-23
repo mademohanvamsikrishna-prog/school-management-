@@ -40,13 +40,11 @@ const C = {
 
 // ─── Service calls ────────────────────────────────────────────────────────────
 async function fetchClasses() {
-  const res = await apiClient.get('/teacher/me/classes');
-  return res.data as any[];
+  return await apiClient.get<any[]>('/teacher/me/classes');
 }
 async function fetchStudents(classId?: string) {
   const url = classId ? `/teacher/class/${classId}/students` : '/teacher/me/students';
-  const res = await apiClient.get(url);
-  return res.data as any[];
+  return await apiClient.get<any[]>(url);
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

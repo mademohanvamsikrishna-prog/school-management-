@@ -74,10 +74,10 @@ export default function StudentProfileScreen() {
   const displayName = profile?.name ?? user?.name ?? 'Student';
   const displayEmail = profile?.email ?? user?.email ?? '';
 
-  const attPct = summary?.attendance?.percentage ?? 0;
+  const attPct = summary?.attendance_percentage ?? 0;
   const rollNo = profile?.student_profile?.roll_number ?? '—';
   const className = profile?.student_profile?.class_name ?? '—';
-  const academicYear = profile?.student_profile?.academic_year ?? '2026–2027';
+  const academicYear = '2026–2027';
 
   const handleLogout = async () => {
     const doLogout = async () => { await logout(); router.replace('/'); };

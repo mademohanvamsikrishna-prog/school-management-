@@ -34,8 +34,7 @@ function todayBackendDay(): number | undefined {
 }
 
 async function fetchTimetable() {
-  const res = await apiClient.get('/teacher/me/timetable');
-  return res.data as any[];
+  return await apiClient.get<any[]>('/teacher/me/timetable');
 }
 
 const SUBJECT_COLORS = [

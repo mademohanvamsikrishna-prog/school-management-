@@ -43,12 +43,10 @@ const C = {
 type AttStatus = 'present' | 'absent' | 'late';
 
 async function fetchClasses() {
-  const res = await apiClient.get('/teacher/me/classes');
-  return res.data as any[];
+  return await apiClient.get<any[]>('/teacher/me/classes');
 }
 async function fetchClassStudents(classId: string) {
-  const res = await apiClient.get(`/teacher/class/${classId}/students`);
-  return res.data as any[];
+  return await apiClient.get<any[]>(`/teacher/class/${classId}/students`);
 }
 
 function initials(name: string) {
