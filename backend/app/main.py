@@ -73,13 +73,14 @@ async def lifespan(app: FastAPI):
 
     # Run incremental seed: ensure all data exists in DB
     try:
-        from app.db.seed import seed_database, ensure_seed_invoices, seed_dhanush_family, seed_telugu_class_9c, seed_requested_users
+        from app.db.seed import seed_database, ensure_seed_invoices, seed_telugu_class_9c, seed_requested_users
         from app.db.session import SessionLocal as _SL
         _db = _SL()
         try:
             seed_database(_db)
             ensure_seed_invoices(_db)
-            seed_dhanush_family(_db)
+            # seed_dhanush_family() intentionally NOT called — it created ghost .edu
+            # duplicates of the canonical .com accounts in seed_requested_users().
             seed_telugu_class_9c(_db)
             seed_requested_users(_db)
         finally:
