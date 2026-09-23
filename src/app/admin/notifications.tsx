@@ -30,7 +30,7 @@ const TYPE_STYLE: Record<string, { icon: string; bg: string; text: string }> = {
   warning:    { icon: '⚠️', bg: P.amberBg,  text: P.amber },
   fee:        { icon: '💳', bg: P.greenBg,  text: P.green },
   marks:      { icon: '📊', bg: P.purpleBg, text: P.purple },
-  attendance: { icon: '📅', bg: P.cyanBg ?? '#ECFEFF', text: '#0891B2' },
+  attendance: { icon: '📅', bg: '#ECFEFF', text: '#0891B2' },
   default:    { icon: '🔔', bg: '#F1F5F9',  text: P.textSec },
 };
 

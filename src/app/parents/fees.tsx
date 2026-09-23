@@ -336,7 +336,7 @@ export default function FeesScreen() {
   }
 
   if (!contextLoading && children.length === 0) {
-    return <ErrorScreen error="No children found for this account." onRetry={() => {}} />;
+    return <ErrorScreen error={{ message: 'No children found for this account.', statusCode: 404 } as any} onRetry={() => {}} />;
   }
 
   return (

@@ -33,9 +33,9 @@ const C = {
   textDark: '#0F172A', textMid: '#334155', textSub: '#64748B', textLight: '#94A3B8',
 };
 
-async function fetchClasses()  { return (await apiClient.get('/teacher/me/classes')).data as any[]; }
+async function fetchClasses()  { return await apiClient.get<any[]>('/teacher/me/classes'); }
 async function fetchStudents(classId: string) {
-  return (await apiClient.get(`/teacher/class/${classId}/students`)).data as any[];
+  return await apiClient.get<any[]>(`/teacher/class/${classId}/students`);
 }
 
 function gradeFromPct(pct: number): string {
@@ -84,7 +84,7 @@ export default function TeacherMarksScreen() {
   // Get exam subjects for the selected class
   const examSubjects: any[] = useMemo(() => {
     if (!selectedExam) return [];
-    return (selectedExam.subjects ?? []).filter(
+    return ((selectedExam as any)?.subjects ?? []).filter(
       (es: any) => !selectedClassId || es.class_id === selectedClassId
     );
   }, [selectedExam, selectedClassId]);

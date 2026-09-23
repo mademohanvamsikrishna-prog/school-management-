@@ -160,14 +160,14 @@ export default function ParentAttendanceScreen() {
     return records.filter(r => r.status === selectedFilter);
   }, [records, selectedFilter]);
 
-  const loading = profileLoading || summaryLoading || recordsLoading;
+  const loading = contextLoading || summaryLoading || recordsLoading;
 
-  if (loading && !profile) {
+  if (loading && !activeChild) {
     return <LoadingScreen message="Loading attendance records..." />;
   }
 
-  if (profileError) {
-    return <ErrorScreen error={profileError} onRetry={refetchProfile} />;
+  if (recordsError) {
+    return <ErrorScreen error={recordsError} onRetry={refetchRecords} />;
   }
 
   return (

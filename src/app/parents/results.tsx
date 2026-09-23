@@ -273,14 +273,14 @@ export default function ParentResultsScreen() {
     };
   }, [subjectMarks]);
 
-  const loading = profileLoading || examsLoading || marksLoading;
+  const loading = contextLoading || examsLoading || marksLoading;
 
-  if (loading && !profile) {
+  if (loading && !activeChild) {
     return <LoadingScreen message="Loading examination results..." />;
   }
 
-  if (profileError) {
-    return <ErrorScreen error={profileError} onRetry={refetchProfile} />;
+  if (marksError) {
+    return <ErrorScreen error={marksError} onRetry={refetchMarks} />;
   }
 
   const isRahul = activeChild?.name?.toLowerCase().includes('rahul');
