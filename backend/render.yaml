@@ -44,9 +44,10 @@ services:
         generateValue: true
 
       # Comma-separated list of allowed frontend origins.
-      # Add your Vercel URL here once you know it:
-      #   https://your-app.vercel.app
-      # Multiple origins: "https://a.vercel.app,https://custom-domain.com"
+      # Set this in the Railway dashboard → Variables:
+      #   CORS_ORIGINS=https://school-management-smoky-six.vercel.app,https://school-management-git-main-mademohanvamsikrishna-8090.vercel.app,https://school-management-e2xcjn0am-mademohanvamsikrishna-8090.vercel.app
+      # NOTE: allow_origin_regex in main.py already covers ALL school-management*.vercel.app
+      # previews automatically, so only the stable production URL strictly needs to be here.
       - key: CORS_ORIGINS
         sync: false
 
