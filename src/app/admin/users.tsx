@@ -385,7 +385,7 @@ export default function AdminUsersScreen() {
               {addRole === 'parent' && (
                 <View style={styles.infoNote}>
                   <Text style={styles.infoNoteText}>
-                    💡 After creating the parent account, link children via the student's profile or the Classes screen.
+                    💡 After creating the parent account, link children via the student&apos;s profile or the Classes screen.
                   </Text>
                 </View>
               )}

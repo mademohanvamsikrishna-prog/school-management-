@@ -329,7 +329,7 @@ export default function ParentAttendanceScreen() {
             <View style={styles.emptyWrap}>
               <Text style={styles.emptyIcon}>📅</Text>
               <Text style={styles.emptyTitle}>No records match filter</Text>
-              <Text style={styles.emptySub}>No attendance entries found for "{selectedFilter}".</Text>
+              <Text style={styles.emptySub}>No attendance entries found for &quot;{selectedFilter}&quot;.</Text>
             </View>
           )}
         </View>

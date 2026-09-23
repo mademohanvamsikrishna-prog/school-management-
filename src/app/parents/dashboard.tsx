@@ -593,7 +593,7 @@ export default function ParentDashboard() {
                     <ChildAvatar name={activeChild?.name} size={28} fontSize={13} />
                     <View>
                       <Text style={styles.cardTitle}>
-                        {activeChild?.name ?? 'Child'}'s Attendance
+                        {activeChild?.name ?? 'Child'}&apos;s Attendance
                       </Text>
                       <Text style={styles.cardSub}>Academic Year 2026–27</Text>
                     </View>
@@ -1122,7 +1122,7 @@ export default function ParentDashboard() {
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: SIZES.sm }}>
                 <ChildAvatar name={activeChild?.name} size={22} fontSize={11} />
                 <Text style={styles.cardSub}>
-                  {activeChild?.name ?? 'Child'}'s attendance ({attendanceData.percentage}%)
+                  {activeChild?.name ?? 'Child'}&apos;s attendance ({attendanceData.percentage}%)
                 </Text>
               </View>
               <View style={styles.mobileAttCountsRow}>

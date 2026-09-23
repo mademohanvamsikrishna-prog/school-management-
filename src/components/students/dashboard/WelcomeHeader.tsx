@@ -89,7 +89,7 @@ export const WelcomeHeader: React.FC<WelcomeHeaderProps> = ({ student, onProfile
           </View>
 
           <Text style={styles.greetingTitle}>{student.greeting}</Text>
-          <Text style={styles.greetingSubtitle}>Here's your academic overview for today.</Text>
+          <Text style={styles.greetingSubtitle}>Here&apos;s your academic overview for today.</Text>
 
           {/* Academic meta badges */}
           <View style={styles.badgeRow}>

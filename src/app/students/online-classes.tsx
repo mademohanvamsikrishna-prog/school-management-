@@ -75,7 +75,7 @@ export default function OnlineClassesScreen() {
         </View>
 
         {/* Today's classes */}
-        <Text style={styles.sectionLabel}>TODAY'S CLASSES</Text>
+        <Text style={styles.sectionLabel}>TODAY&apos;S CLASSES</Text>
         {todayClasses.length === 0 ? (
           <View style={styles.emptyCard}>
             <Text style={styles.emptyIcon}>🎥</Text>
