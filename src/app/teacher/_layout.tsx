@@ -72,17 +72,20 @@ export default function TeacherLayout() {
 
       {/* ── Hidden from tab bar — accessible via sidebar ── */}
       <Tabs.Screen name="classes"       options={{ href: null }} />
-      <Tabs.Screen name="tasks"         options={{ href: null }} />
-      <Tabs.Screen name="chat"          options={{ href: null }} />
       <Tabs.Screen name="timetable"     options={{ href: null }} />
+      <Tabs.Screen name="assignments"   options={{ href: null }} />
       <Tabs.Screen name="notifications" options={{ href: null }} />
+      <Tabs.Screen name="chat"          options={{ href: null }} />
+      <Tabs.Screen name="tasks"         options={{ href: null }} />
+      <Tabs.Screen name="settings"      options={{ href: null }} />
+      <Tabs.Screen name="help"          options={{ href: null }} />
     </Tabs>
   );
 
   if (IS_WEB) {
     return (
       <AuthGuard allowedRoles={['teacher', 'staff', 'admin']}>
-        <View style={{ flex: 1, flexDirection: 'row', backgroundColor: '#F1F5F9' }}>
+        <View style={{ flex: 1, flexDirection: 'row', backgroundColor: '#F0F4FF' }}>
           <TeacherSidebar />
           <View style={{ flex: 1, overflow: 'hidden' }}>
             {tabs}
