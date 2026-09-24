@@ -711,16 +711,16 @@ def seed_telugu_class_9c(db: Session) -> None:
 
     hashed_pwd = get_password_hash("password123")  # FIX #11: hash once per fn
 
-    teacher = db.query(User).filter(User.email == "teacher@school.edu").first()
+    teacher = db.query(User).filter(User.email == "telugu.teacher@school.edu").first()
     if not teacher:
         teacher = User(
-            email="teacher@school.edu",
+            email="telugu.teacher@school.edu",
             hashed_password=hashed_pwd,
-            name="Priya Desai",
+            name="Kavitha Reddy",
             role_id=teacher_role.id,
-            avatar_url="https://i.pravatar.cc/150?u=priya",
+            avatar_url="https://i.pravatar.cc/150?u=kavitha",
         )
-        teacher.teacher_profile = TeacherProfile(employee_id="TCH-1001", department="Mathematics", qualification="M.Sc. Mathematics, B.Ed.", is_class_teacher=True)
+        teacher.teacher_profile = TeacherProfile(employee_id="TCH-1003", department="Languages", qualification="M.A. Telugu, B.Ed.", is_class_teacher=True)
         db.add(teacher)
         db.flush()
 
