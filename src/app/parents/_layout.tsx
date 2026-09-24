@@ -4,7 +4,7 @@ import { COLORS } from '../../constants/theme';
 import { AuthGuard } from '../../components/guards/AuthGuard';
 import { ParentSidebar } from '../../components/parents/ParentSidebar';
 import { ParentChildProvider } from '../../context/ParentChildContext';
-
+import { ParentDataProvider } from '../../context/ParentDataContext';
 
 export default function ParentsLayout() {
   const IS_WEB = Platform.OS === 'web';
@@ -71,9 +71,46 @@ export default function ParentsLayout() {
         }}
       />
       <Tabs.Screen
+        name="timetable"
+        options={{
+          title: 'Timetable',
+          tabBarIcon: ({ focused }) => (
+            <Text style={{ fontSize: 20, opacity: focused ? 1 : 0.6 }}>📅</Text>
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="homework"
+        options={{
+          title: 'Homework',
+          tabBarIcon: ({ focused }) => (
+            <Text style={{ fontSize: 20, opacity: focused ? 1 : 0.6 }}>📖</Text>
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="announcements"
+        options={{
+          title: 'Announcements',
+          tabBarIcon: ({ focused }) => (
+            <Text style={{ fontSize: 20, opacity: focused ? 1 : 0.6 }}>📢</Text>
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="messages"
+        options={{
+          title: 'Messages',
+          tabBarIcon: ({ focused }) => (
+            <Text style={{ fontSize: 20, opacity: focused ? 1 : 0.6 }}>💬</Text>
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="chat"
         options={{
           title: 'Chat',
+          href: null,
           tabBarIcon: ({ focused }) => (
             <Text style={{ fontSize: 20, opacity: focused ? 1 : 0.6 }}>💬</Text>
           ),
@@ -115,12 +152,14 @@ export default function ParentsLayout() {
     return (
       <AuthGuard allowedRoles={['parent', 'admin']}>
         <ParentChildProvider>
-          <View style={{ flex: 1, flexDirection: 'row', backgroundColor: '#F1F5F9' }}>
-            <ParentSidebar />
-            <View style={{ flex: 1, overflow: 'hidden' }}>
-              {tabs}
+          <ParentDataProvider>
+            <View style={{ flex: 1, flexDirection: 'row', backgroundColor: '#F1F5F9' }}>
+              <ParentSidebar />
+              <View style={{ flex: 1, overflow: 'hidden' }}>
+                {tabs}
+              </View>
             </View>
-          </View>
+          </ParentDataProvider>
         </ParentChildProvider>
       </AuthGuard>
     );
@@ -129,7 +168,9 @@ export default function ParentsLayout() {
   return (
     <AuthGuard allowedRoles={['parent', 'admin']}>
       <ParentChildProvider>
-        {tabs}
+        <ParentDataProvider>
+          {tabs}
+        </ParentDataProvider>
       </ParentChildProvider>
     </AuthGuard>
   );
