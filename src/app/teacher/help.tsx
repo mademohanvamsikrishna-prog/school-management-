@@ -120,7 +120,7 @@ export default function TeacherHelpScreen() {
           {filtered.length === 0 ? (
             <View style={{ padding: SIZES.lg, alignItems: 'center' }}>
               <Text style={{ fontSize: 32 }}>🔍</Text>
-              <Text style={[hStyles.faqQ, { textAlign: 'center', marginTop: 8 }]}>No results for "{search}"</Text>
+              <Text style={[hStyles.faqQ, { textAlign: 'center', marginTop: 8 }]}>No results for &ldquo;{search}&rdquo;</Text>
             </View>
           ) : (
             filtered.map((faq, i) => (
@@ -148,11 +148,11 @@ export default function TeacherHelpScreen() {
         <Text style={hStyles.sectionTitle}>📩 Contact Support</Text>
         <View style={hStyles.contactCard}>
           <Text style={hStyles.contactDesc}>
-            Can't find an answer? Send a message to the school administration and we'll get back to you within 24 hours.
+            Can&apos;t find an answer? Send a message to the school administration and we&apos;ll get back to you within 24 hours.
           </Text>
           {sent && (
             <View style={hStyles.sentBanner}>
-              <Text style={hStyles.sentText}>✅ Message sent! We'll respond within 24 hours.</Text>
+              <Text style={hStyles.sentText}>✅ Message sent! We&apos;ll respond within 24 hours.</Text>
             </View>
           )}
           <TextInput

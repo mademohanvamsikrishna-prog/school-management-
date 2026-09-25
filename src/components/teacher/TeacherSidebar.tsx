@@ -1,10 +1,29 @@
 /**
- * TeacherSidebar — full 13-item scrollable sidebar, mirroring StudentSidebar.
+ * TeacherSidebar — Redesigned sidebar matching Section 2 of prompt specifications.
+ * Fixed width (~250px), purple active indicators, notification badge '3', and bottom motivational card.
  */
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
+import {
+  View, Text, TouchableOpacity, StyleSheet, ScrollView,
+  Platform,
+} from 'react-native';
 import { useRouter, usePathname } from 'expo-router';
-import { COLORS, SIZES, FONTS, SHADOWS } from '../../constants/theme';
+import { useAuth } from '../../context/AuthContext';
+import { SIZES, FONTS, SHADOWS } from '../../constants/theme';
+
+const C = {
+  bg: '#FFFFFF',
+  border: '#E2E8F0',
+  purple: '#7C3AED',
+  purpleLight: '#F5F3FF',
+  purpleActiveBg: '#EDE9FE',
+  activeText: '#7C3AED',
+  navText: '#475569',
+  sectionLabel: '#94A3B8',
+  textDark: '#0F172A',
+  cardMotivateBg: '#F5F3FF',
+  badgeRed: '#EF4444',
+};
 
 interface NavItem {
   label: string;
@@ -14,177 +33,264 @@ interface NavItem {
   badge?: string;
 }
 
-const PRIMARY_NAV: NavItem[] = [
-  { label: 'Dashboard',     icon: '⊞',  route: '/teacher/dashboard',      segment: 'dashboard'      },
-  { label: 'My Classes',    icon: '👥', route: '/teacher/classes',         segment: 'classes'        },
-  { label: 'My Students',   icon: '🎓', route: '/teacher/students',        segment: 'students'       },
-  { label: 'Attendance',    icon: '📊', route: '/teacher/attendance',      segment: 'attendance'     },
-  { label: 'Marks / Results', icon: '🏆', route: '/teacher/marks',         segment: 'marks'          },
-  { label: 'Timetable',     icon: '🗓️', route: '/teacher/timetable',       segment: 'timetable'      },
-  { label: 'Assignments',   icon: '📋', route: '/teacher/tasks',           segment: 'tasks'          },
-  { label: 'Notifications', icon: '🔔', route: '/teacher/notifications',   segment: 'notifications'  },
-  { label: 'Messages',      icon: '💬', route: '/teacher/chat',            segment: 'chat'           },
-  { label: 'Profile',       icon: '👤', route: '/teacher/profile',         segment: 'profile'        },
-];
-
-const SECONDARY_NAV: NavItem[] = [
-  { label: 'Settings', icon: '⚙️', route: '/teacher/profile', segment: 'settings' },
-  { label: 'Help',     icon: '❓', route: '/teacher/profile', segment: 'help'     },
+const NAV_ITEMS: NavItem[] = [
+  { label: 'Dashboard',      icon: '⊞',  route: '/teacher/dashboard',     segment: 'dashboard' },
+  { label: 'My Classes',     icon: '👥', route: '/teacher/classes',        segment: 'classes' },
+  { label: 'My Students',    icon: '🎓', route: '/teacher/students',       segment: 'students' },
+  { label: 'Attendance',     icon: '📊', route: '/teacher/attendance',     segment: 'attendance' },
+  { label: 'Marks / Results',icon: '🏆', route: '/teacher/marks',          segment: 'marks' },
+  { label: 'Timetable',      icon: '🗓️', route: '/teacher/timetable',      segment: 'timetable' },
+  { label: 'Assignments',    icon: '📋', route: '/teacher/assignments',    segment: 'assignments' },
+  { label: 'Notifications',  icon: '🔔', route: '/teacher/notifications',  segment: 'notifications', badge: '3' },
+  { label: 'Messages',       icon: '💬', route: '/teacher/chat',           segment: 'chat' },
+  { label: 'Profile',        icon: '👤', route: '/teacher/profile',        segment: 'profile' },
 ];
 
 export const TeacherSidebar: React.FC = () => {
   const router = useRouter();
   const pathname = usePathname();
+  const { user, logout } = useAuth();
 
-  const isHighlighted = (item: NavItem): boolean => {
+  const initials = user?.name
+    ? user.name.split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase()
+    : 'TS';
+
+  const isActive = (item: NavItem): boolean => {
     if (pathname === item.route) return true;
     if (pathname === '/teacher' && item.segment === 'dashboard') return true;
     return pathname.endsWith(`/${item.segment}`) || pathname.includes(`/${item.segment}/`);
   };
 
-  const renderNavItem = (item: NavItem) => {
-    const highlighted = isHighlighted(item);
-    return (
-      <TouchableOpacity
-        key={item.label}
-        style={[styles.navItem, highlighted && styles.navItemActive]}
-        onPress={() => router.push(item.route as any)}
-        activeOpacity={0.7}
-      >
-        <Text style={styles.navIcon}>{item.icon}</Text>
-        <Text style={[styles.navLabel, highlighted && styles.navLabelActive]}>
-          {item.label}
-        </Text>
-        {item.badge && (
-          <View style={styles.badge}>
-            <Text style={styles.badgeText}>{item.badge}</Text>
-          </View>
-        )}
-      </TouchableOpacity>
-    );
+  const handleLogout = async () => {
+    if (Platform.OS === 'web') {
+      if (window.confirm('Are you sure you want to logout?')) {
+        await logout();
+        router.replace('/');
+      }
+    }
   };
 
   return (
-    <View style={styles.sidebar}>
-      {/* Logo / Branding */}
-      <View style={styles.brand}>
-        <View style={styles.logoMark}>
-          <Text style={styles.logoText}>△</Text>
+    <View style={sStyles.sidebar}>
+      {/* Branding */}
+      <View style={sStyles.brand}>
+        <View style={sStyles.logoMark}>
+          <Text style={sStyles.logoMarkText}>🏫</Text>
         </View>
-        <Text style={styles.brandName}>School</Text>
+        <View>
+          <Text style={sStyles.brandName}>Smart School</Text>
+          <Text style={sStyles.brandSub}>Teacher Portal</Text>
+        </View>
       </View>
 
-      <View style={styles.divider} />
+      <View style={sStyles.divider} />
 
-      {/* Primary navigation — scrollable */}
+      {/* Navigation List */}
       <ScrollView
         style={{ flex: 1 }}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.navGroup}
+        contentContainerStyle={sStyles.scrollContent}
       >
-        {PRIMARY_NAV.map(renderNavItem)}
+        {NAV_ITEMS.map((item) => {
+          const active = isActive(item);
+          return (
+            <TouchableOpacity
+              key={item.segment}
+              style={[sStyles.navItem, active && sStyles.navItemActive]}
+              onPress={() => router.push(item.route as any)}
+              activeOpacity={0.8}
+            >
+              <View style={[sStyles.iconWrap, active && sStyles.iconWrapActive]}>
+                <Text style={[sStyles.navIcon, active && { color: C.purple }]}>{item.icon}</Text>
+              </View>
+              <Text style={[sStyles.navLabel, active && sStyles.navLabelActive]} numberOfLines={1}>
+                {item.label}
+              </Text>
+              {item.badge && (
+                <View style={sStyles.badge}>
+                  <Text style={sStyles.badgeText}>{item.badge}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          );
+        })}
 
-        <View style={styles.divider} />
-        <Text style={styles.sectionLabel}>MORE</Text>
-        {SECONDARY_NAV.map(renderNavItem)}
-        <View style={{ height: SIZES.md }} />
+        {/* Motivational Card at Bottom of Sidebar */}
+        <View style={sStyles.motivateCard}>
+          <View style={sStyles.motivateIconWrap}>
+            <Text style={{ fontSize: 20 }}>🌟</Text>
+          </View>
+          <Text style={sStyles.motivateText}>
+            {"\"Make learning\nbrighter, one\nstudent at a time!\""}
+          </Text>
+        </View>
+
+        <View style={{ height: 16 }} />
       </ScrollView>
+
+      {/* User Footer */}
+      <View style={sStyles.divider} />
+      <View style={sStyles.userFooter}>
+        <View style={sStyles.avatarSmall}>
+          <Text style={sStyles.avatarSmallText}>{initials}</Text>
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={sStyles.userName} numberOfLines={1}>{user?.name ?? 'Ms. Sreeja'}</Text>
+          <Text style={sStyles.userRole}>Teacher</Text>
+        </View>
+        <TouchableOpacity onPress={handleLogout} style={sStyles.logoutBtn}>
+          <Text style={sStyles.logoutIcon}>↪</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 };
 
-const styles = StyleSheet.create({
+const sStyles = StyleSheet.create({
   sidebar: {
-    width: 220,
-    backgroundColor: COLORS.card,
+    width: 250,
+    backgroundColor: C.bg,
     borderRightWidth: 1,
-    borderRightColor: COLORS.border,
-    paddingTop: SIZES.xl,
-    paddingBottom: SIZES.md,
+    borderRightColor: C.border,
+    paddingTop: SIZES.lg,
+    flexDirection: 'column',
     ...SHADOWS.small,
     zIndex: 10,
-    flexDirection: 'column',
   },
   brand: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: SIZES.lg,
-    marginBottom: SIZES.lg,
-    gap: SIZES.sm,
+    paddingHorizontal: 16,
+    marginBottom: 12,
+    gap: 12,
   },
   logoMark: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
-    backgroundColor: '#7C3AED',
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: C.purple,
     alignItems: 'center',
     justifyContent: 'center',
+    ...SHADOWS.small,
   },
-  logoText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '700',
-  },
+  logoMarkText: { fontSize: 20 },
   brandName: {
-    ...FONTS.h4,
-    color: COLORS.textDark,
+    fontSize: 16,
+    fontWeight: '800',
+    color: C.textDark,
+    letterSpacing: -0.2,
+  },
+  brandSub: {
+    fontSize: 11,
+    color: C.purple,
     fontWeight: '700',
-    letterSpacing: -0.3,
+    marginTop: 1,
   },
   divider: {
     height: 1,
-    backgroundColor: COLORS.border,
-    marginHorizontal: SIZES.lg,
-    marginVertical: SIZES.sm,
+    backgroundColor: C.border,
+    marginHorizontal: 16,
+    marginVertical: 10,
   },
-  navGroup: {
-    paddingHorizontal: SIZES.sm,
-    gap: 2,
-    paddingTop: SIZES.xs,
-  },
-  sectionLabel: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: COLORS.textLight,
-    letterSpacing: 1.2,
-    paddingHorizontal: SIZES.md,
-    paddingVertical: SIZES.xs,
+  scrollContent: {
+    paddingHorizontal: 12,
+    paddingTop: 4,
   },
   navItem: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 10,
-    paddingHorizontal: SIZES.md,
-    borderRadius: SIZES.radiusSm,
-    gap: SIZES.sm,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    marginBottom: 4,
+    gap: 12,
   },
   navItemActive: {
-    backgroundColor: '#F5F3FF',
+    backgroundColor: C.purpleActiveBg,
+  },
+  iconWrap: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  iconWrapActive: {
+    backgroundColor: '#DDD6FE',
   },
   navIcon: {
     fontSize: 16,
-    width: 22,
     textAlign: 'center',
   },
   navLabel: {
-    ...FONTS.body2,
-    color: COLORS.textSecondary,
+    fontSize: 14,
     fontWeight: '500',
+    color: C.navText,
     flex: 1,
   },
   navLabelActive: {
-    color: '#7C3AED',
-    fontWeight: '700',
+    color: C.purple,
+    fontWeight: '800',
   },
   badge: {
-    backgroundColor: '#7C3AED',
+    backgroundColor: C.badgeRed,
     borderRadius: 10,
-    paddingHorizontal: 6,
-    paddingVertical: 1,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  badgeText: {
-    color: '#FFFFFF',
-    fontSize: 10,
+  badgeText: { color: '#FFF', fontSize: 11, fontWeight: '800' },
+
+  motivateCard: {
+    backgroundColor: C.cardMotivateBg,
+    borderRadius: 16,
+    padding: 16,
+    marginTop: 20,
+    marginBottom: 8,
+    marginHorizontal: 4,
+    borderWidth: 1,
+    borderColor: '#E9D5FF',
+    alignItems: 'flex-start',
+  },
+  motivateIconWrap: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    backgroundColor: '#DDD6FE',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 10,
+  },
+  motivateText: {
+    fontSize: 12,
     fontWeight: '700',
+    color: C.purple,
+    lineHeight: 17,
   },
+
+  userFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    gap: 12,
+  },
+  avatarSmall: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: C.purple,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarSmallText: { color: '#FFF', fontSize: 14, fontWeight: '800' },
+  userName: { fontSize: 14, fontWeight: '700', color: C.textDark },
+  userRole: { fontSize: 11, color: C.sectionLabel, fontWeight: '600' },
+  logoutBtn: {
+    padding: 8,
+    borderRadius: 10,
+    backgroundColor: '#FEE2E2',
+  },
+  logoutIcon: { fontSize: 14, color: '#EF4444' },
 });
