@@ -1,269 +1,407 @@
 /**
- * TeacherTimetableScreen — Full weekly timetable for the teacher.
- * Mirrors /students/timetable — day tabs, period cards, today highlighted.
+ * Teacher Timetable Screen
  *
- * API: GET /teacher/me/timetable  (no day filter → all days)
+ * Premium Modern School ERP Teacher Timetable Dashboard.
+ * Matches reference design with soft glassmorphism, crisp cards,
+ * full responsiveness (Desktop 3-column with fixed sidebar from TeacherLayout & right panel),
+ * and dynamic calculations from backend APIs.
+ *
+ * APIs used:
+ * - GET /api/v1/teacher/me/timetable
+ * - GET /api/v1/teacher/me/classes
+ * - GET /api/v1/events
  */
-import React, { useMemo, useState } from 'react';
+
+import React, { useState, useMemo, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, SafeAreaView,
-  TouchableOpacity, Platform,
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  SafeAreaView,
+  Platform,
+  useWindowDimensions,
+  TouchableOpacity,
 } from 'react-native';
 import { useApi } from '../../hooks/useApi';
 import { api as apiClient } from '../../services/api';
 import { LoadingScreen, ErrorScreen } from '../../components/ScreenStates';
-import { COLORS, SIZES, FONTS, SHADOWS } from '../../constants/theme';
+
+// Subcomponents
+import { TimetableTopHeader } from '../../components/teacher/timetable/TimetableTopHeader';
+import { TimetableBanner } from '../../components/teacher/timetable/TimetableBanner';
+import { TimetableSummaryCards } from '../../components/teacher/timetable/TimetableSummaryCards';
+import { TimetableControlsBar, ClassOption } from '../../components/teacher/timetable/TimetableControlsBar';
+import { TimetableGrid, TimetableEntryItem, PERIOD_SLOTS, DAYS_DEF } from '../../components/teacher/timetable/TimetableGrid';
+import { TodaysSchedulePanel } from '../../components/teacher/timetable/TodaysSchedulePanel';
+import { UpcomingEventsCard } from '../../components/teacher/timetable/UpcomingEventsCard';
+import { QuickNotesCard } from '../../components/teacher/timetable/QuickNotesCard';
+import { TimetableDetailModal } from '../../components/teacher/timetable/TimetableDetailModal';
+import { EditTimetableModal } from '../../components/teacher/timetable/EditTimetableModal';
 
 const IS_WEB = Platform.OS === 'web';
-
-const C = {
-  bg: '#F1F5F9', card: '#FFFFFF', border: '#E2E8F0',
-  purple: '#7C3AED', purpleLight: '#F5F3FF',
-  indigo: '#4F46E5', indigoLight: '#EEF2FF',
-  green: '#10B981', amber: '#F59E0B',
-  textDark: '#0F172A', textMid: '#334155', textSub: '#64748B', textLight: '#94A3B8',
-};
-
-const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-const DAY_FULL = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-
-function todayBackendDay(): number | undefined {
-  const d = new Date().getDay();
-  if (d === 0) return undefined;
-  return d;
-}
 
 async function fetchTimetable() {
   return await apiClient.get<any[]>('/teacher/me/timetable');
 }
 
-const SUBJECT_COLORS = [
-  { bg: '#EEF2FF', text: '#4F46E5', dot: '#4F46E5' },
-  { bg: '#F5F3FF', text: '#7C3AED', dot: '#7C3AED' },
-  { bg: '#D1FAE5', text: '#059669', dot: '#10B981' },
-  { bg: '#FEF3C7', text: '#D97706', dot: '#F59E0B' },
-  { bg: '#FEE2E2', text: '#DC2626', dot: '#EF4444' },
-  { bg: '#E0F2FE', text: '#0369A1', dot: '#0EA5E9' },
-];
-
-function subjectColor(subjectName: string) {
-  const idx = Math.abs([...subjectName].reduce((a, c) => a + c.charCodeAt(0), 0)) % SUBJECT_COLORS.length;
-  return SUBJECT_COLORS[idx];
+async function fetchClasses() {
+  return await apiClient.get<any[]>('/teacher/me/classes');
 }
 
-function formatTime(t: string) {
-  const [h, m] = t.split(':');
-  const hour = parseInt(h, 10);
-  const ampm = hour >= 12 ? 'PM' : 'AM';
-  const hour12 = hour % 12 || 12;
-  return `${hour12}:${m} ${ampm}`;
+async function fetchEvents() {
+  try {
+    return await apiClient.get<any[]>('/events?upcoming_only=true');
+  } catch (e) {
+    return [];
+  }
+}
+
+// Helper to calculate week date range string (e.g., "Sep 22 – Sep 26, 2026")
+function getWeekRangeLabel(weekOffset: number): { label: string; currentDayNum: number } {
+  const now = new Date();
+  const currentDayNum = now.getDay() === 0 ? 7 : now.getDay(); // 1=Mon...7=Sun
+
+  const mon = new Date(now);
+  const diffToMon = (now.getDay() === 0 ? -6 : 1 - now.getDay()) + weekOffset * 7;
+  mon.setDate(now.getDate() + diffToMon);
+
+  const fri = new Date(mon);
+  fri.setDate(mon.getDate() + 4);
+
+  const monMonth = mon.toLocaleDateString('en-US', { month: 'short' });
+  const friMonth = fri.toLocaleDateString('en-US', { month: 'short' });
+
+  const label =
+    monMonth === friMonth
+      ? `${monMonth} ${mon.getDate()} – ${fri.getDate()}, ${mon.getFullYear()}`
+      : `${monMonth} ${mon.getDate()} – ${friMonth} ${fri.getDate()}, ${mon.getFullYear()}`;
+
+  return { label, currentDayNum };
 }
 
 export default function TeacherTimetableScreen() {
-  const todayDay = todayBackendDay();
-  const [activeDay, setActiveDay] = useState<number>(todayDay ?? 1);
+  const { width } = useWindowDimensions();
+  const isDesktop = width >= 1024;
 
-  const { data: entries, loading, error, refetch } = useApi(fetchTimetable);
+  // Search & Filter State
+  const [searchQuery, setSearchQuery] = useState('');
+  const [weekOffset, setWeekOffset] = useState(0);
+  const [selectedClassId, setSelectedClassId] = useState<string | null>(null);
+  const [academicYear, setAcademicYear] = useState('2025 - 2026');
 
-  const byDay = useMemo(() => {
-    const map: Record<number, any[]> = {};
-    for (let d = 1; d <= 6; d++) map[d] = [];
-    (entries ?? []).forEach((e: any) => {
-      if (map[e.day_of_week]) map[e.day_of_week].push(e);
+  // Modals state
+  const [selectedEntryDetail, setSelectedEntryDetail] = useState<TimetableEntryItem | null>(null);
+  const [editingEntry, setEditingEntry] = useState<TimetableEntryItem | null>(null);
+
+  // API Data
+  const {
+    data: rawTimetable,
+    loading: timetableLoading,
+    error: timetableError,
+    refetch: refetchTimetable,
+  } = useApi(fetchTimetable);
+
+  const { data: classesData, loading: classesLoading } = useApi(fetchClasses);
+  const { data: eventsData } = useApi(fetchEvents);
+
+  const classes: ClassOption[] = useMemo(() => classesData ?? [], [classesData]);
+
+  // Local state for editable timetable entries
+  const [customEntries, setCustomEntries] = useState<TimetableEntryItem[] | null>(null);
+
+  const activeEntries: TimetableEntryItem[] = useMemo(() => {
+    const list = customEntries ?? rawTimetable ?? [];
+    if (!selectedClassId) return list;
+    return list.filter((e) => e.class_id === selectedClassId);
+  }, [rawTimetable, customEntries, selectedClassId]);
+
+  // Week Date Info
+  const { label: weekLabel, currentDayNum } = useMemo(
+    () => getWeekRangeLabel(weekOffset),
+    [weekOffset]
+  );
+
+  const todayStr = useMemo(() => {
+    return new Date().toLocaleDateString('en-US', {
+      weekday: 'long',
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
     });
-    for (let d = 1; d <= 6; d++) {
-      map[d].sort((a: any, b: any) => a.start_time.localeCompare(b.start_time));
+  }, []);
+
+  // Today's Entries (for today's day of week: 1=Mon...6=Sat)
+  const todayEntries = useMemo(() => {
+    const todayNum = currentDayNum > 6 ? 1 : currentDayNum;
+    return activeEntries.filter((e) => e.day_of_week === todayNum);
+  }, [activeEntries, currentDayNum]);
+
+  // Compute summary metrics dynamically (Part 6, 19, 20)
+  const summaryData = useMemo(() => {
+    const todayClassesCount = todayEntries.length;
+    const totalPeriodsPerDay = 8;
+    const freePeriodsCount = Math.max(0, totalPeriodsPerDay - todayClassesCount);
+    const weeklyClassesCount = activeEntries.length;
+
+    // Find next class today based on current time
+    const now = new Date();
+    const currentMins = now.getHours() * 60 + now.getMinutes();
+
+    let nextSub: string | null = null;
+    let nextTime: string | null = null;
+    let nextRoom: string | null = null;
+
+    // Sort today's entries by start time
+    const sortedToday = [...todayEntries].sort((a, b) => a.start_time.localeCompare(b.start_time));
+
+    for (const e of sortedToday) {
+      const [h, m] = e.start_time.slice(0, 5).split(':').map(Number);
+      const startMins = h * 60 + m;
+      if (startMins > currentMins) {
+        nextSub = e.subject_name;
+        // Format time 12h
+        const hour12 = h % 12 || 12;
+        const ampm = h >= 12 ? 'PM' : 'AM';
+        nextTime = `${hour12}:${m < 10 ? '0' : ''}${m} ${ampm}`;
+        nextRoom = e.room_number ? `Room ${e.room_number}` : 'Room 101';
+        break;
+      }
     }
-    return map;
-  }, [entries]);
 
-  const todayEntries = byDay[activeDay] ?? [];
+    return {
+      todayClassesCount,
+      totalPeriodsPerDay,
+      freePeriodsCount,
+      weeklyClassesCount,
+      nextClassSubject: nextSub,
+      nextClassTime: nextTime,
+      nextClassRoom: nextRoom,
+    };
+  }, [todayEntries, activeEntries]);
 
-  if (loading) return <LoadingScreen message="Loading timetable…" />;
-  if (error)   return <ErrorScreen error={error} onRetry={refetch} />;
+  // Edit Timetable Handler
+  const handleSaveEntryEdit = (updatedEntry: TimetableEntryItem) => {
+    setCustomEntries((prev) => {
+      const base = prev ?? rawTimetable ?? [];
+      return base.map((e) => (e.id === updatedEntry.id ? updatedEntry : e));
+    });
+  };
+
+  const handleRefresh = useCallback(() => {
+    refetchTimetable();
+  }, [refetchTimetable]);
 
   return (
-    <SafeAreaView style={ttStyles.safeArea}>
-      {/* Header */}
-      <View style={ttStyles.pageHeader}>
-        <View>
-          <Text style={ttStyles.pageTitle}>My Timetable</Text>
-          <Text style={ttStyles.pageSubtitle}>
-            {(entries ?? []).length} periods · {DAY_FULL[(activeDay ?? 1) - 1]}
-          </Text>
-        </View>
-        {todayDay !== undefined && (
-          <View style={ttStyles.todayBadge}>
-            <Text style={ttStyles.todayBadgeText}>Today: {DAYS[(todayDay) - 1]}</Text>
-          </View>
-        )}
-      </View>
+    <SafeAreaView style={styles.safeArea}>
+      <View style={styles.bodyWorkspace}>
+        {/* Top Header */}
+        <TimetableTopHeader
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+        />
 
-      {/* Day tabs */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={ttStyles.dayTabsScroll}>
-        <View style={ttStyles.dayTabs}>
-          {DAYS.map((day, i) => {
-            const dayNum = i + 1;
-            const isToday = dayNum === todayDay;
-            const isActive = dayNum === activeDay;
-            const count = (byDay[dayNum] ?? []).length;
-            return (
-              <TouchableOpacity
-                key={day}
-                style={[
-                  ttStyles.dayTab,
-                  isActive && ttStyles.dayTabActive,
-                  isToday && !isActive && ttStyles.dayTabToday,
-                ]}
-                onPress={() => setActiveDay(dayNum)}
-              >
-                <Text style={[ttStyles.dayTabLabel, isActive && ttStyles.dayTabLabelActive]}>{day}</Text>
-                {count > 0 && (
-                  <View style={[ttStyles.periodCountBadge, isActive && { backgroundColor: 'rgba(255,255,255,0.3)' }]}>
-                    <Text style={[ttStyles.periodCountText, isActive && { color: '#FFF' }]}>{count}</Text>
-                  </View>
-                )}
+        <ScrollView
+          style={styles.scrollArea}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Banner Header */}
+          <TimetableBanner />
+
+          {/* Part 29: Error State */}
+          {timetableError ? (
+            <View style={styles.errorCard}>
+              <Text style={{ fontSize: 36 }}>⚠️</Text>
+              <Text style={styles.errorTitle}>Unable to load timetable</Text>
+              <Text style={styles.errorSub}>
+                Please check your network connection or server status.
+              </Text>
+              <TouchableOpacity style={styles.retryBtn} onPress={handleRefresh}>
+                <Text style={styles.retryBtnText}>Retry</Text>
               </TouchableOpacity>
-            );
-          })}
-        </View>
-      </ScrollView>
+            </View>
+          ) : (
+            <>
+              {/* Controls: Week Nav, Today, Class Filter, Academic Year */}
+              <TimetableControlsBar
+                weekLabel={weekLabel}
+                onPrevWeek={() => setWeekOffset((w) => w - 1)}
+                onNextWeek={() => setWeekOffset((w) => w + 1)}
+                onToday={() => setWeekOffset(0)}
+                classes={classes}
+                selectedClassId={selectedClassId}
+                onSelectClass={setSelectedClassId}
+                academicYear={academicYear}
+                onSelectAcademicYear={setAcademicYear}
+              />
 
-      {/* Period list */}
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={ttStyles.listPad}>
-        {todayEntries.length === 0 ? (
-          <View style={ttStyles.emptyState}>
-            <Text style={ttStyles.emptyIcon}>🗓️</Text>
-            <Text style={ttStyles.emptyText}>No classes on {DAY_FULL[(activeDay ?? 1) - 1]}</Text>
-            <Text style={ttStyles.emptySubText}>Enjoy your free day!</Text>
-          </View>
-        ) : (
-          todayEntries.map((entry: any, idx: number) => {
-            const subName = entry.subject_name ?? entry.subject?.name ?? 'Subject';
-            const clsName = entry.class_name ?? entry.class_room?.name ?? 'Class';
-            const col = subjectColor(subName);
-            return (
-              <View key={entry.id ?? idx} style={[ttStyles.periodCard, { borderLeftColor: col.dot }]}>
-                <View style={ttStyles.periodTimeCol}>
-                  <Text style={ttStyles.periodStart}>{formatTime(entry.start_time)}</Text>
-                  <View style={ttStyles.periodTimeLine} />
-                  <Text style={ttStyles.periodEnd}>{formatTime(entry.end_time)}</Text>
+              {/* Summary Cards */}
+              <TimetableSummaryCards data={summaryData} />
+
+              {/* Main Content Row: Grid + Right Side Panel */}
+              <View style={[styles.layoutRow, !isDesktop && styles.layoutColumn]}>
+                {/* Left Column: Weekly Timetable Matrix */}
+                <View style={[styles.gridCol, !isDesktop && { width: '100%' }]}>
+                  {timetableLoading || classesLoading ? (
+                    <LoadingScreen message="Loading weekly timetable..." />
+                  ) : activeEntries.length === 0 && (rawTimetable ?? []).length === 0 ? (
+                    <View style={styles.emptyCard}>
+                      <Text style={{ fontSize: 40 }}>🗓️</Text>
+                      <Text style={styles.emptyTitle}>No timetable available</Text>
+                      <Text style={styles.emptySub}>
+                        No classes are scheduled for this period.
+                      </Text>
+                      <TouchableOpacity style={styles.refreshBtn} onPress={handleRefresh}>
+                        <Text style={styles.refreshBtnText}>Refresh Timetable</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ) : (
+                    <TimetableGrid
+                      entries={activeEntries}
+                      currentDayNum={currentDayNum}
+                      highlightToday={weekOffset === 0}
+                      onCellClick={(entry) => setSelectedEntryDetail(entry)}
+                      searchQuery={searchQuery}
+                    />
+                  )}
                 </View>
 
-                <View style={[ttStyles.periodContent, { backgroundColor: col.bg }]}>
-                  <View style={[ttStyles.periodDot, { backgroundColor: col.dot }]} />
-                  <View style={{ flex: 1 }}>
-                    <Text style={[ttStyles.periodSubject, { color: col.text }]}>{subName}</Text>
-                    <View style={ttStyles.periodMeta}>
-                      <Text style={ttStyles.periodMetaTxt}>📚 {clsName}</Text>
-                      {entry.room_number && (
-                        <Text style={ttStyles.periodMetaTxt}>🚪 {entry.room_number}</Text>
-                      )}
-                    </View>
-                  </View>
-                  <View style={ttStyles.durationBadge}>
-                    <Text style={[ttStyles.durationTxt, { color: col.text }]}>
-                      {calcDuration(entry.start_time, entry.end_time)}
-                    </Text>
-                  </View>
+                {/* Right Column: Today's Schedule, Events & Quick Notes (~340px) */}
+                <View style={[styles.sideCol, !isDesktop && { width: '100%', maxWidth: '100%' }]}>
+                  <TodaysSchedulePanel
+                    todayEntries={todayEntries}
+                    dateString={todayStr}
+                  />
+
+                  <UpcomingEventsCard />
+
+                  <QuickNotesCard />
                 </View>
               </View>
-            );
-          })
-        )}
-      </ScrollView>
+            </>
+          )}
+
+          <View style={{ height: 40 }} />
+        </ScrollView>
+      </View>
+
+      {/* Interactive Timetable Cell Detail Modal */}
+      <TimetableDetailModal
+        visible={selectedEntryDetail !== null}
+        onClose={() => setSelectedEntryDetail(null)}
+        entry={selectedEntryDetail}
+        academicYear={academicYear}
+        onOpenEdit={() => setEditingEntry(selectedEntryDetail)}
+        canEdit={true}
+      />
+
+      {/* Interactive Edit Timetable Entry Modal */}
+      <EditTimetableModal
+        visible={editingEntry !== null}
+        onClose={() => setEditingEntry(null)}
+        entry={editingEntry}
+        onSave={handleSaveEntryEdit}
+      />
     </SafeAreaView>
   );
 }
 
-function calcDuration(start: string, end: string): string {
-  const [sh, sm] = start.split(':').map(Number);
-  const [eh, em] = end.split(':').map(Number);
-  const mins = (eh * 60 + em) - (sh * 60 + sm);
-  if (mins < 60) return `${mins}m`;
-  return `${Math.floor(mins / 60)}h ${mins % 60 > 0 ? `${mins % 60}m` : ''}`.trim();
-}
-
-const ttStyles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: C.bg },
-  pageHeader: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    justifyContent: 'space-between',
-    paddingHorizontal: SIZES.lg,
-    paddingTop: IS_WEB ? SIZES.lg : SIZES.xl,
-    paddingBottom: SIZES.md,
-  },
-  pageTitle: { ...FONTS.h2, color: C.textDark, fontWeight: '700' },
-  pageSubtitle: { ...FONTS.body2, color: C.textSub, marginTop: 2 },
-  todayBadge: {
-    backgroundColor: C.purpleLight,
-    borderRadius: 20,
-    paddingHorizontal: SIZES.md,
-    paddingVertical: 6,
-  },
-  todayBadgeText: { ...FONTS.caption, color: C.purple, fontWeight: '700' },
-
-  dayTabsScroll: { maxHeight: 60 },
-  dayTabs: { flexDirection: 'row', paddingHorizontal: SIZES.lg, gap: SIZES.sm, paddingBottom: SIZES.sm },
-  dayTab: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: SIZES.md,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: C.card,
-    borderWidth: 1,
-    borderColor: C.border,
-  },
-  dayTabActive: { backgroundColor: C.purple, borderColor: C.purple },
-  dayTabToday: { borderColor: C.purple, borderWidth: 2 },
-  dayTabLabel: { ...FONTS.body2, color: C.textSub, fontWeight: '700' },
-  dayTabLabelActive: { color: '#FFF' },
-  periodCountBadge: {
-    backgroundColor: '#EEF2FF',
-    borderRadius: 10,
-    paddingHorizontal: 5,
-    paddingVertical: 1,
-  },
-  periodCountText: { fontSize: 10, fontWeight: '700', color: C.purple },
-
-  listPad: { paddingHorizontal: SIZES.lg, paddingTop: SIZES.md, paddingBottom: 80, gap: SIZES.sm },
-
-  periodCard: {
-    flexDirection: 'row',
-    gap: SIZES.md,
-    borderLeftWidth: 4,
-    paddingLeft: SIZES.sm,
-  },
-  periodTimeCol: { width: 58, alignItems: 'center', paddingTop: 4 },
-  periodStart: { ...FONTS.caption, color: C.textSub, fontWeight: '700', fontSize: 11 },
-  periodTimeLine: { width: 1, flex: 1, backgroundColor: C.border, marginVertical: 3 },
-  periodEnd: { ...FONTS.caption, color: C.textLight, fontSize: 10 },
-  periodContent: {
+const styles = StyleSheet.create({
+  safeArea: {
     flex: 1,
+    backgroundColor: '#F8FAFC',
+  },
+  bodyWorkspace: {
+    flex: 1,
+    backgroundColor: '#F8FAFC',
+  },
+  scrollArea: {
+    flex: 1,
+  },
+  scrollContent: {
+    padding: 24,
+  },
+  layoutRow: {
     flexDirection: 'row',
+    gap: 24,
+    alignItems: 'flex-start',
+  },
+  layoutColumn: {
+    flexDirection: 'column',
+  },
+  gridCol: {
+    flex: 1,
+    minWidth: 0,
+  },
+  sideCol: {
+    width: 340,
+    maxWidth: 340,
+  },
+  errorCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 40,
     alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#FCA5A5',
+    gap: 12,
+    marginVertical: 20,
+  },
+  errorTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#991B1B',
+  },
+  errorSub: {
+    fontSize: 14,
+    color: '#64748B',
+    textAlign: 'center',
+  },
+  retryBtn: {
+    backgroundColor: '#7C3AED',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
     borderRadius: 12,
-    padding: SIZES.md,
-    gap: SIZES.sm,
+    marginTop: 8,
   },
-  periodDot: { width: 8, height: 8, borderRadius: 4, marginRight: 2 },
-  periodSubject: { ...FONTS.body1, fontWeight: '700', marginBottom: 3 },
-  periodMeta: { flexDirection: 'row', flexWrap: 'wrap', gap: SIZES.sm },
-  periodMetaTxt: { ...FONTS.caption, color: C.textSub },
-  durationBadge: {
-    backgroundColor: 'rgba(255,255,255,0.5)',
-    borderRadius: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
+  retryBtnText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '800',
   },
-  durationTxt: { fontSize: 11, fontWeight: '700' },
-
-  emptyState: { alignItems: 'center', paddingTop: 60, gap: SIZES.sm },
-  emptyIcon: { fontSize: 48 },
-  emptyText: { ...FONTS.h4, color: C.textMid },
-  emptySubText: { ...FONTS.body2, color: C.textSub },
+  emptyCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    gap: 10,
+    marginBottom: 20,
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  emptySub: {
+    fontSize: 14,
+    color: '#64748B',
+    textAlign: 'center',
+  },
+  refreshBtn: {
+    backgroundColor: '#7C3AED',
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    borderRadius: 12,
+    marginTop: 6,
+  },
+  refreshBtnText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '800',
+  },
 });
-

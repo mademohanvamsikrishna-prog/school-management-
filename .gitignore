@@ -52,6 +52,12 @@ backend/.mypy_cache/
 
 example
 
+# local temporary files
+powershell.cmd
+scratch/
+.claude/
+.vscode/
+
 # generated native folders
 /ios
 /android
