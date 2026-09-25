@@ -15,6 +15,7 @@ import React, {
 import {
   View, Text, StyleSheet, Animated, Platform, TouchableOpacity,
 } from 'react-native';
+import { nativeDriver } from '../utils/animation';
 
 type ToastType = 'success' | 'error' | 'info' | 'warning';
 
@@ -50,9 +51,9 @@ function ToastItem({ toast, onDismiss }: { toast: Toast; onDismiss: () => void }
 
   React.useEffect(() => {
     Animated.sequence([
-      Animated.timing(opacity, { toValue: 1, duration: 220, useNativeDriver: true }),
+      Animated.timing(opacity, { toValue: 1, duration: 220, useNativeDriver: nativeDriver }),
       Animated.delay(toast.duration ?? 3000),
-      Animated.timing(opacity, { toValue: 0, duration: 220, useNativeDriver: true }),
+      Animated.timing(opacity, { toValue: 0, duration: 220, useNativeDriver: nativeDriver }),
     ]).start(() => onDismiss());
   }, []);
 

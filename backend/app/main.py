@@ -146,6 +146,49 @@ app = create_application()
 
 
 # ---------------------------------------------------------------------------
+# Explicit OPTIONS preflight handler
+#
+# FastAPI's CORSMiddleware handles preflights for registered routes, but
+# during a cold start the lifespan (seed, DB check) can block for 30-60 s.
+# The browser sends its CORS preflight before the server is fully ready,
+# gets no response, and cancels both the preflight AND the real request.
+#
+# This bare OPTIONS route is registered directly on the ASGI app BEFORE the
+# lifespan runs, so it responds immediately with 204 No Content as soon as
+# Uvicorn/Gunicorn accepts the connection — unblocking the browser preflight.
+# ---------------------------------------------------------------------------
+
+from fastapi.responses import Response
+
+@app.options("/{rest_of_path:path}", include_in_schema=False)
+async def preflight_handler(rest_of_path: str) -> Response:
+    """
+    Catch-all OPTIONS handler.
+    Returns 204 No Content immediately so browser preflights never time out,
+    even during a cold-start boot when the lifespan is still initialising.
+    The actual CORS response headers are injected by CORSMiddleware.
+    """
+    return Response(status_code=204)
+
+
+# ---------------------------------------------------------------------------
+# Wake endpoint — lightweight ping for cold-start probing
+#
+# The frontend can GET /wake on app load to trigger the server spin-up
+# before the user clicks "Login", hiding the cold-start delay entirely.
+# ---------------------------------------------------------------------------
+
+@app.get("/wake", include_in_schema=False)
+async def wake() -> Response:
+    """
+    Lightweight no-op endpoint.  Call this on app load to pre-warm a
+    cold-started free-tier server before the user attempts to log in.
+    """
+    return Response(status_code=204)
+
+
+
+# ---------------------------------------------------------------------------
 # Root
 # ---------------------------------------------------------------------------
 

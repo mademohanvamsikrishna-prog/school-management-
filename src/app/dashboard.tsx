@@ -8,6 +8,7 @@ import {
   View,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { nativeDriver } from '../utils/animation';
 
 type Role = 'student' | 'parent' | 'staff';
 
@@ -41,21 +42,21 @@ export default function Dashboard() {
         toValue: 1,
         friction: 7,
         tension: 50,
-        useNativeDriver: true,
+        useNativeDriver: nativeDriver,
       }),
 
       Animated.spring(cardsAnim, {
         toValue: 1,
         friction: 7,
         tension: 50,
-        useNativeDriver: true,
+        useNativeDriver: nativeDriver,
       }),
 
       Animated.spring(contentAnim, {
         toValue: 1,
         friction: 7,
         tension: 50,
-        useNativeDriver: true,
+        useNativeDriver: nativeDriver,
       }),
     ]).start();
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -602,14 +603,14 @@ function DashboardCard({
         Animated.timing(opacity, {
           toValue: 1,
           duration: 500,
-          useNativeDriver: true,
+          useNativeDriver: nativeDriver,
         }),
 
         Animated.spring(scale, {
           toValue: 1,
           friction: 6,
           tension: 60,
-          useNativeDriver: true,
+          useNativeDriver: nativeDriver,
         }),
       ]).start();
     }, delay);
@@ -669,7 +670,7 @@ function ActionButton({
     Animated.spring(scale, {
       toValue: 0.94,
       friction: 5,
-      useNativeDriver: true,
+      useNativeDriver: nativeDriver,
     }).start();
   };
 
@@ -677,7 +678,7 @@ function ActionButton({
     Animated.spring(scale, {
       toValue: 1,
       friction: 5,
-      useNativeDriver: true,
+      useNativeDriver: nativeDriver,
     }).start();
   };
 

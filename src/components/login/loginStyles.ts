@@ -394,6 +394,30 @@ export const loginStyles = StyleSheet.create({
   },
 
   // ===================================================
+  // WAKING UP HINT (cold-start banner)
+  // ===================================================
+
+  wakingUpBox: {
+    backgroundColor: '#fffbeb',
+    borderRadius: 11,
+    padding: 12,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#fde68a',
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+
+  wakingUpText: {
+    flex: 1,
+    color: '#92400e',
+    fontSize: 12,
+    fontWeight: '600',
+    lineHeight: 18,
+  },
+
+
+  // ===================================================
   // OPTIONS
   // ===================================================
 

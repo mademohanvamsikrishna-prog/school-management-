@@ -6,6 +6,8 @@
  */
 import { api } from './api';
 import { AuthSession } from './types';
+import { ENV } from '../config/env';
+
 
 export interface LoginPayload {
   email: string;
@@ -61,11 +63,33 @@ function mapToSession(raw: BackendTokenResponse): AuthSession {
  * POST /api/v1/auth/login
  * Returns a mapped AuthSession on success.
  * Throws ApiError on failure (handled by AuthContext).
+ *
+ * Uses LOGIN_TIMEOUT_MS (90 s) instead of the default TIMEOUT_MS so that
+ * cold-starting free-tier hosts (Railway / Render) have enough time to wake up.
  */
 export async function loginApi(payload: LoginPayload): Promise<AuthSession> {
-  const raw = await api.post<BackendTokenResponse>('/auth/login', payload);
+  const raw = await api.post<BackendTokenResponse>(
+    '/auth/login',
+    payload,
+    undefined,            // no extra headers
+    ENV.LOGIN_TIMEOUT_MS  // 90 s cold-start timeout
+  );
   return mapToSession(raw);
 }
+
+/**
+ * Returns true when an ApiError looks like a cold-start timeout rather than
+ * a genuine connectivity failure.  Use this in the login screen to show a
+ * friendlier "Server is waking up…" message.
+ *
+ *   statusCode 408 → AbortController fired (our own timeout)
+ *   statusCode 0   → fetch() itself rejected (no network at all)
+ */
+export function isWakingUp(err: unknown): boolean {
+  const e = err as { statusCode?: number };
+  return e?.statusCode === 408;
+}
+
 
 /**
  * GET /api/v1/auth/me
@@ -88,7 +112,7 @@ export async function refreshApi(refreshToken: string): Promise<AuthSession> {
 
 /**
  * POST /api/v1/auth/logout
- * Revokes the refresh token on the server (best-effort, no throw on failure).
+ * Revokes the refresh token on the server (best-effort, no throw on failure).\
  */
 export async function logoutApi(refreshToken: string): Promise<void> {
   try {
@@ -97,3 +121,18 @@ export async function logoutApi(refreshToken: string): Promise<void> {
     // Swallow errors — local session is cleared regardless
   }
 }
+
+/**
+ * GET /wake
+ * Fire-and-forget ping that pre-warms the server on app load.
+ * Call this as early as possible (e.g. in _layout.tsx) so the
+ * Railway/Render cold-start completes before the user clicks Login.
+ * Never throws — failure is silently swallowed.
+ */
+export function wakeServer(): void {
+  const baseUrl = ENV.API_BASE_URL.replace(/\/api\/v1$/, '');
+  fetch(`${baseUrl}/wake`, { method: 'GET' }).catch(() => {
+    // Best-effort only — don't block anything
+  });
+}
+

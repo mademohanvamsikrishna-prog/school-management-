@@ -11,6 +11,7 @@
  */
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Animated, Platform } from 'react-native';
+import { nativeDriver } from '../utils/animation';
 
 function useNetworkStatus() {
   const [isOnline, setIsOnline] = useState(true);
@@ -56,9 +57,9 @@ export function OfflineBanner() {
   useEffect(() => {
     if (!isOnline) {
       setVisible(true);
-      Animated.spring(slideY, { toValue: 0, useNativeDriver: true, tension: 80 }).start();
+      Animated.spring(slideY, { toValue: 0, useNativeDriver: nativeDriver, tension: 80 }).start();
     } else {
-      Animated.timing(slideY, { toValue: -60, duration: 300, useNativeDriver: true })
+      Animated.timing(slideY, { toValue: -60, duration: 300, useNativeDriver: nativeDriver })
         .start(() => setVisible(false));
     }
   }, [isOnline]);
