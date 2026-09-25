@@ -483,7 +483,7 @@ export default function TeacherDashboard() {
               <View style={styles.welcomeBanner}>
                 <View style={styles.bannerLeft}>
                   <Text style={styles.bannerGreeting}>Good {greeting()}, {firstName}! 👋</Text>
-                  <Text style={styles.bannerSub}>Let's make today a great learning day.</Text>
+                  <Text style={styles.bannerSub}>Let&apos;s make today a great learning day.</Text>
                 </View>
                 <View style={styles.bannerRight}>
                   <Text style={styles.bannerDate}>{todayStr}</Text>
@@ -531,7 +531,7 @@ export default function TeacherDashboard() {
                 <View style={styles.sectionHeader}>
                   <View style={styles.sectionTitleRow}>
                     <Text style={styles.sectionIcon}>📅</Text>
-                    <Text style={styles.sectionTitle}>Today's Schedule</Text>
+                    <Text style={styles.sectionTitle}>Today&apos;s Schedule</Text>
                   </View>
                   <TouchableOpacity onPress={() => router.push('/teacher/timetable' as any)} style={styles.seeAllBtn}>
                     <Text style={styles.seeAll}>See All →</Text>
@@ -708,7 +708,7 @@ export default function TeacherDashboard() {
             <View style={styles.welcomeBanner}>
               <View style={styles.bannerLeft}>
                 <Text style={styles.bannerGreeting}>Good {greeting()}, {firstName}! 👋</Text>
-                <Text style={styles.bannerSub}>Let's make today a great learning day.</Text>
+                <Text style={styles.bannerSub}>Let&apos;s make today a great learning day.</Text>
               </View>
               <View style={[styles.blob, styles.blob1]} />
               <View style={[styles.blob, styles.blob2]} />
@@ -728,7 +728,7 @@ export default function TeacherDashboard() {
             {/* Schedule */}
             <View style={[styles.sectionCard, { marginHorizontal: 16 }]}>
               <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>📅 Today's Schedule</Text>
+                <Text style={styles.sectionTitle}>📅 Today&apos;s Schedule</Text>
                 <TouchableOpacity onPress={() => router.push('/teacher/timetable' as any)}>
                   <Text style={styles.seeAll}>See All →</Text>
                 </TouchableOpacity>
