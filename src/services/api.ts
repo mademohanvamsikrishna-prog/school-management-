@@ -32,7 +32,8 @@ class ApiClient {
 
   private async request<T>(
     endpoint: string,
-    options: RequestInit = {}
+    options: RequestInit = {},
+    timeoutMs: number = ENV.TIMEOUT_MS
   ): Promise<T> {
     const token = await this.getAuthToken();
     const headers: Record<string, string> = {
@@ -46,7 +47,7 @@ class ApiClient {
     }
 
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), ENV.TIMEOUT_MS);
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
 
     try {
       const url = `${this.baseUrl}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
@@ -112,13 +113,14 @@ class ApiClient {
   public async post<T>(
     endpoint: string,
     data?: unknown,
-    headers?: Record<string, string>
+    headers?: Record<string, string>,
+    timeoutMs?: number
   ): Promise<T> {
     return this.request<T>(endpoint, {
       method: 'POST',
       body: data ? JSON.stringify(data) : undefined,
       headers,
-    });
+    }, timeoutMs);
   }
 
   public async put<T>(

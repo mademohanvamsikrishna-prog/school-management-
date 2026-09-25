@@ -34,7 +34,15 @@ const _effectiveFallback = _isProductionBrowser ? RAILWAY_URL : _localFallback;
 
 export const ENV = {
   API_BASE_URL: process.env.EXPO_PUBLIC_API_BASE_URL ?? _effectiveFallback,
-  TIMEOUT_MS: 10_000,
+  /** Default timeout for all API requests (ms). */
+  TIMEOUT_MS: 90_000,
+  /**
+   * Dedicated timeout for the login request (ms).
+   * Free-tier hosts (Railway, Render) can take 30-60 s to cold-start.
+   * 90 s gives them enough headroom while still failing fast if the
+   * server is genuinely unreachable.
+   */
+  LOGIN_TIMEOUT_MS: 90_000,
   APP_NAME: 'School Management System',
   APP_VERSION: '1.0.0',
 };

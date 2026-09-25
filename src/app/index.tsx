@@ -21,6 +21,8 @@ import { AnimatedFeature } from '../components/login/AnimatedFeature';
 import { LoginBackground } from '../components/login/LoginBackground';
 import { loginStyles as styles } from '../components/login/loginStyles';
 import { ApiError } from '../services/types';
+import { isWakingUp } from '../services/auth';
+import { nativeDriver } from '../utils/animation';
 
 type UserRole = 'student' | 'parent' | 'staff';
 
@@ -44,6 +46,8 @@ export default function LoginScreen() {
   const [passwordFocused, setPasswordFocused] = useState(false);
   const [loading, setLoading]         = useState(false);
   const [error, setError]             = useState('');
+  /** True while we're waiting for a cold-start server to wake up. */
+  const [wakingUp, setWakingUp]       = useState(false);
 
   // =====================================================
   // ANIMATIONS
@@ -82,8 +86,8 @@ export default function LoginScreen() {
 
   useEffect(() => {
     Animated.parallel([
-      Animated.timing(logoOpacity, { toValue: 1, duration: 700, easing: Easing.out(Easing.ease), useNativeDriver: true }),
-      Animated.spring(logoScale, { toValue: 1, friction: 5, tension: 60, useNativeDriver: true }),
+      Animated.timing(logoOpacity, { toValue: 1, duration: 700, easing: Easing.out(Easing.ease), useNativeDriver: nativeDriver }),
+      Animated.spring(logoScale, { toValue: 1, friction: 5, tension: 60, useNativeDriver: nativeDriver }),
     ]).start();
 
     const delays: [Animated.Value, number][] = [
@@ -99,23 +103,23 @@ export default function LoginScreen() {
 
     delays.forEach(([anim, delay]) => {
       setTimeout(() => {
-        Animated.spring(anim, { toValue: 1, friction: 7, tension: 55, useNativeDriver: true }).start();
+        Animated.spring(anim, { toValue: 1, friction: 7, tension: 55, useNativeDriver: nativeDriver }).start();
       }, delay);
     });
 
     // Card slide/scale in
     setTimeout(() => {
       Animated.parallel([
-        Animated.spring(cardSlide, { toValue: 0, friction: 7, tension: 55, useNativeDriver: true }),
-        Animated.spring(cardScale, { toValue: 1, friction: 7, tension: 55, useNativeDriver: true }),
+        Animated.spring(cardSlide, { toValue: 0, friction: 7, tension: 55, useNativeDriver: nativeDriver }),
+        Animated.spring(cardScale, { toValue: 1, friction: 7, tension: 55, useNativeDriver: nativeDriver }),
       ]).start();
     }, 450);
 
     // Floating logo loop
     Animated.loop(
       Animated.sequence([
-        Animated.timing(logoFloat, { toValue: -8, duration: 1800, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
-        Animated.timing(logoFloat, { toValue:  8, duration: 1800, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        Animated.timing(logoFloat, { toValue: -8, duration: 1800, easing: Easing.inOut(Easing.ease), useNativeDriver: nativeDriver }),
+        Animated.timing(logoFloat, { toValue:  8, duration: 1800, easing: Easing.inOut(Easing.ease), useNativeDriver: nativeDriver }),
       ])
     ).start();
 
@@ -123,8 +127,8 @@ export default function LoginScreen() {
     const bubbleLoop = (anim: Animated.Value, dur: number, dist: number) =>
       Animated.loop(
         Animated.sequence([
-          Animated.timing(anim, { toValue:  dist, duration: dur, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
-          Animated.timing(anim, { toValue: -dist, duration: dur, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+          Animated.timing(anim, { toValue:  dist, duration: dur, easing: Easing.inOut(Easing.ease), useNativeDriver: nativeDriver }),
+          Animated.timing(anim, { toValue: -dist, duration: dur, easing: Easing.inOut(Easing.ease), useNativeDriver: nativeDriver }),
         ])
       ).start();
 
@@ -140,11 +144,11 @@ export default function LoginScreen() {
 
   const shakeError = () => {
     Animated.sequence([
-      Animated.timing(errorShake, { toValue: -12, duration: 60, useNativeDriver: true }),
-      Animated.timing(errorShake, { toValue:  12, duration: 60, useNativeDriver: true }),
-      Animated.timing(errorShake, { toValue:  -8, duration: 60, useNativeDriver: true }),
-      Animated.timing(errorShake, { toValue:   8, duration: 60, useNativeDriver: true }),
-      Animated.timing(errorShake, { toValue:   0, duration: 60, useNativeDriver: true }),
+      Animated.timing(errorShake, { toValue: -12, duration: 60, useNativeDriver: nativeDriver }),
+      Animated.timing(errorShake, { toValue:  12, duration: 60, useNativeDriver: nativeDriver }),
+      Animated.timing(errorShake, { toValue:  -8, duration: 60, useNativeDriver: nativeDriver }),
+      Animated.timing(errorShake, { toValue:   8, duration: 60, useNativeDriver: nativeDriver }),
+      Animated.timing(errorShake, { toValue:   0, duration: 60, useNativeDriver: nativeDriver }),
     ]).start();
   };
 
@@ -165,16 +169,23 @@ export default function LoginScreen() {
 
     setLoading(true);
 
+    // If the request takes >5 s, the server is likely cold-starting.
+    // Show the "waking up" hint proactively so users don't assume it's broken.
+    const wakingUpTimer = setTimeout(() => setWakingUp(true), 5_000);
+
     try {
       // login() returns the AuthUser synchronously (no state-read race condition).
       const returnedUser = await login(email.trim().toLowerCase(), password);
+
+      clearTimeout(wakingUpTimer);
+      setWakingUp(false);
 
       // Success animation
       Animated.spring(successScale, {
         toValue: 1,
         friction: 5,
         tension: 70,
-        useNativeDriver: true,
+        useNativeDriver: nativeDriver,
       }).start();
 
       // Navigate based on the role returned directly from login().
@@ -194,8 +205,16 @@ export default function LoginScreen() {
         shakeError();
       }
     } catch (err: unknown) {
+      clearTimeout(wakingUpTimer);
+      setWakingUp(false);
       const apiErr = err as ApiError;
-      if (apiErr?.statusCode === 403) {
+      if (isWakingUp(err)) {
+        // Cold-start timeout — server is booting, not a real error.
+        setError(
+          'The server is taking longer than expected to start up (free-tier cold start). ' +
+          'Please wait a moment and try again — it usually wakes up within 60 seconds.'
+        );
+      } else if (apiErr?.statusCode === 403) {
         setError('Your account has been disabled. Please contact the school administrator.');
       } else if (apiErr?.statusCode === 0) {
         setError('Cannot reach the server. Please check your network connection.');
@@ -215,24 +234,24 @@ export default function LoginScreen() {
 
   const pressLogin = () => {
     Animated.sequence([
-      Animated.spring(buttonScale, { toValue: 0.94, friction: 5, useNativeDriver: true }),
-      Animated.spring(buttonScale, { toValue: 1,    friction: 5, useNativeDriver: true }),
+      Animated.spring(buttonScale, { toValue: 0.94, friction: 5, useNativeDriver: nativeDriver }),
+      Animated.spring(buttonScale, { toValue: 1,    friction: 5, useNativeDriver: nativeDriver }),
     ]).start();
     handleLogin();
   };
 
   const togglePassword = () => {
     Animated.sequence([
-      Animated.spring(eyeScale, { toValue: 0.7, friction: 4, useNativeDriver: true }),
-      Animated.spring(eyeScale, { toValue: 1,   friction: 4, useNativeDriver: true }),
+      Animated.spring(eyeScale, { toValue: 0.7, friction: 4, useNativeDriver: nativeDriver }),
+      Animated.spring(eyeScale, { toValue: 1,   friction: 4, useNativeDriver: nativeDriver }),
     ]).start();
     setShowPassword(v => !v);
   };
 
   const toggleRemember = () => {
     Animated.sequence([
-      Animated.spring(checkboxScale, { toValue: 0.7, friction: 4, useNativeDriver: true }),
-      Animated.spring(checkboxScale, { toValue: 1,   friction: 4, useNativeDriver: true }),
+      Animated.spring(checkboxScale, { toValue: 0.7, friction: 4, useNativeDriver: nativeDriver }),
+      Animated.spring(checkboxScale, { toValue: 1,   friction: 4, useNativeDriver: nativeDriver }),
     ]).start();
     setRememberMe(v => !v);
   };
@@ -443,6 +462,16 @@ export default function LoginScreen() {
                 </Animated.View>
               )}
 
+              {/* WAKING UP HINT — shown after 5 s of cold-start delay */}
+              {wakingUp && !error && (
+                <View style={styles.wakingUpBox}>
+                  <Text style={styles.wakingUpText}>
+                    🔄 The server is waking up from sleep (free-tier cold start).{"\n"}
+                    This can take up to 60 seconds — please wait…
+                  </Text>
+                </View>
+              )}
+
               {/* OPTIONS */}
               <Animated.View style={slideUp(optionsAnim)}>
                 <View style={styles.optionsRow}>
@@ -484,7 +513,9 @@ export default function LoginScreen() {
                   {loading ? (
                     <View style={styles.loadingContainer}>
                       <ActivityIndicator color="#ffffff" size="small" />
-                      <Text style={styles.loadingText}>Signing in...</Text>
+                      <Text style={styles.loadingText}>
+                        {wakingUp ? 'Waking server up…' : 'Signing in...'}
+                      </Text>
                     </View>
                   ) : (
                     <Text style={styles.loginButtonText}>

@@ -6,6 +6,7 @@
 import { useEffect, useRef } from 'react';
 import { Animated, Easing, Text, View } from 'react-native';
 import { loginStyles as styles } from './loginStyles';
+import { nativeDriver } from '../../utils/animation';
 
 interface AnimatedFeatureProps {
   icon: string;
@@ -26,19 +27,19 @@ export function AnimatedFeature({ icon, text, delay }: AnimatedFeatureProps) {
           toValue: 1,
           duration: 500,
           easing: Easing.out(Easing.ease),
-          useNativeDriver: true,
+          useNativeDriver: nativeDriver,
         }),
         Animated.spring(translateX, {
           toValue: 0,
           friction: 6,
           tension: 60,
-          useNativeDriver: true,
+          useNativeDriver: nativeDriver,
         }),
         Animated.spring(scale, {
           toValue: 1,
           friction: 5,
           tension: 60,
-          useNativeDriver: true,
+          useNativeDriver: nativeDriver,
         }),
       ]).start();
     }, 900 + delay);

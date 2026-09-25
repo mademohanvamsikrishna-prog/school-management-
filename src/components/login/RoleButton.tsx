@@ -6,6 +6,7 @@
 import { useRef } from 'react';
 import { Animated, Pressable, Text, View } from 'react-native';
 import { loginStyles as styles } from './loginStyles';
+import { nativeDriver } from '../../utils/animation';
 
 interface RoleButtonProps {
   icon: string;
@@ -21,7 +22,7 @@ export function RoleButton({ icon, title, selected, onPress }: RoleButtonProps) 
     Animated.spring(scale, {
       toValue: 0.92,
       friction: 5,
-      useNativeDriver: true,
+      useNativeDriver: nativeDriver,
     }).start();
   };
 
@@ -29,7 +30,7 @@ export function RoleButton({ icon, title, selected, onPress }: RoleButtonProps) 
     Animated.spring(scale, {
       toValue: 1,
       friction: 5,
-      useNativeDriver: true,
+      useNativeDriver: nativeDriver,
     }).start();
   };
 
