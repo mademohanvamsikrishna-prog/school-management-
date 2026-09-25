@@ -86,11 +86,22 @@ async def lifespan(app: FastAPI):
         import time as _t
         _t.sleep(2)  # brief pause so uvicorn finishes binding the port first
         try:
+            from app.db.base import Base
+            from app.db.session import engine as _engine, SessionLocal as _SL
+            # Import all models so their metadata is registered on Base
+            import app.models  # noqa: F401
+
+            # Create all tables that don't exist yet.
+            # This is equivalent to `alembic upgrade head` for a fresh DB.
+            # Safe to call repeatedly — create_all is idempotent (IF NOT EXISTS).
+            print("[Seed] Running Base.metadata.create_all()...")
+            Base.metadata.create_all(bind=_engine)
+            print("[Seed] Tables ready.")
+
             from app.db.seed import (
                 seed_database, ensure_seed_invoices,
                 seed_telugu_class_9c, seed_requested_users,
             )
-            from app.db.session import SessionLocal as _SL
             _db = _SL()
             try:
                 print("[Seed] Background seed starting...")
@@ -103,7 +114,10 @@ async def lifespan(app: FastAPI):
             finally:
                 _db.close()
         except Exception as _err:
-            print(f"[Seed] WARNING — seed failed (non-fatal): {_err}")
+            import traceback
+            print(f"[Seed] ERROR — seed failed: {_err}")
+            traceback.print_exc()
+
 
     _seed_thread = threading.Thread(target=_run_seed, daemon=True, name="db-seed")
     _seed_thread.start()
