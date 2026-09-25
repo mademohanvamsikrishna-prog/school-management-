@@ -123,17 +123,19 @@ class Settings(BaseSettings):
         Never silently fall back to SQLite in production.
         """
         is_production = self.ENVIRONMENT.lower() in ("production", "prod")
-        is_postgres = (
-            self.DATABASE_URL.startswith("postgresql://")
-            or self.DATABASE_URL.startswith("postgresql+psycopg2://")
-            or self.DATABASE_URL.startswith("postgresql+asyncpg://")
-        )
+        is_postgres = self.DATABASE_URL.startswith((
+            "postgresql://",
+            "postgresql+psycopg2://",
+            "postgresql+psycopg://",
+            "postgresql+asyncpg://",
+        ))
         if is_production and not is_postgres:
             raise RuntimeError(
                 f"CRITICAL CONFIGURATION ERROR: PostgreSQL is strictly required in production mode. "
                 f"Configured DATABASE_URL is '{self.DATABASE_URL}'. SQLite is only permitted in "
                 f"development and test environments."
             )
+
 
 
 settings = Settings()
