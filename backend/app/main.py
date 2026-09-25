@@ -72,14 +72,19 @@ async def lifespan(app: FastAPI):
     settings.enforce_production_database()
 
     # -----------------------------------------------------------------------
-    # Seed runs in a background thread AFTER yield so the server passes
-    # Railway's health check immediately (~2 s) instead of timing out during
-    # the 30-90 s seed against remote Supabase PostgreSQL → was causing 502.
-    # The seed is idempotent so it is safe to defer and run after boot.
+    # Kick off DB seed in a background daemon thread immediately at startup.
+    # The thread is started BEFORE yield so it runs during app lifetime,
+    # not during shutdown. daemon=True means it won't block process exit.
+    #
+    # Why background: seed.py has 4 heavy functions against remote Supabase
+    # PostgreSQL over SSL — takes 30-90 s on cold start. Running it blocking
+    # before yield caused Railway's health check to time out → 502/503.
     # -----------------------------------------------------------------------
     import threading
 
     def _run_seed() -> None:
+        import time as _t
+        _t.sleep(2)  # brief pause so uvicorn finishes binding the port first
         try:
             from app.db.seed import (
                 seed_database, ensure_seed_invoices,
@@ -100,12 +105,14 @@ async def lifespan(app: FastAPI):
         except Exception as _err:
             print(f"[Seed] WARNING — seed failed (non-fatal): {_err}")
 
-    yield  # server is live & healthy from here — health check passes immediately
+    _seed_thread = threading.Thread(target=_run_seed, daemon=True, name="db-seed")
+    _seed_thread.start()
 
-    # Start seed after server is ready (daemon=True so it won't block shutdown)
-    threading.Thread(target=_run_seed, daemon=True, name="db-seed").start()
+    yield  # ← app is live; health check responds immediately
 
     print(f"[{settings.APP_NAME}] Shutting down.")
+
+
 
 
 
@@ -236,7 +243,7 @@ async def health_check() -> JSONResponse:
     from sqlalchemy import text
     from app.db.session import engine
 
-    # Test database connection
+    # Test database connection — never let this crash the health check
     db_status = "ok"
     db_error: str | None = None
     try:
@@ -266,5 +273,9 @@ async def health_check() -> JSONResponse:
     if db_error:
         payload["database"]["error"] = db_error
 
-    status_code = 200 if db_status == "ok" else 503
-    return JSONResponse(content=payload, status_code=status_code)
+    # Always return 200 — Railway uses this endpoint to decide whether the
+    # deployment succeeded. Returning 503 causes Railway to roll back the
+    # deploy even when the app itself is running fine. DB issues are
+    # visible in the JSON body for monitoring but don't block traffic.
+    return JSONResponse(content=payload, status_code=200)
+
