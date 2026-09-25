@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { Slot } from 'expo-router';
 import { Platform, LogBox } from 'react-native';
 import { AuthProvider } from '../context/AuthContext';
@@ -10,15 +11,17 @@ if (Platform.OS === 'web') {
   LogBox.ignoreLogs(['Animated: `useNativeDriver` is not supported']);
 }
 
-// Pre-warm the free-tier Railway/Render server as early as possible.
-// This fires a lightweight GET /wake request so the cold-start completes
-// before the user reaches the login screen and clicks "Login".
-wakeServer();
-
 export default function RootLayout() {
+  useEffect(() => {
+    // Pre-warm the free-tier Railway/Render server as early as possible.
+    // Must be inside useEffect (not module top-level) to avoid React #418
+    // hydration mismatch — fetch behaves differently during SSR vs client.
+    wakeServer();
+  }, []);
+
   return (
     <AuthProvider>
       <Slot />
     </AuthProvider>
   );
-}
+}

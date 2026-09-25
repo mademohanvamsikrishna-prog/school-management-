@@ -143,13 +143,12 @@ def create_application() -> FastAPI:
     application.add_middleware(
         CORSMiddleware,
         allow_origins=settings.get_cors_origins(),
-        # Covers ALL Vercel preview deployments for this project automatically.
-        # Pattern: https://school-management-<hash>-mademohanvamsikrishna-8090.vercel.app
-        # This avoids manually adding each new preview URL to CORS_ORIGINS.
-        allow_origin_regex=(
-            r"https://school-management(-[a-z0-9]+)*"
-            r"(-mademohanvamsikrishna-8090)?\.vercel\.app"
-        ),
+        # Covers ALL *.vercel.app preview deployments for this project.
+        # Matches any subdomain starting with "school-management":
+        #   https://school-management-smoky-six.vercel.app
+        #   https://school-management-bs76lyshn-mademohanvamsikrishna-8090.vercel.app
+        #   https://school-management-git-main-mademohanvamsikrishna-8090.vercel.app
+        allow_origin_regex=r"https://school-management[a-z0-9A-Z\-]*\.vercel\.app",
         allow_credentials=True,
         allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
         allow_headers=["Authorization", "Content-Type", "Accept", "X-Request-ID"],
