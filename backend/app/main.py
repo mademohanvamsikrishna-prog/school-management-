@@ -71,26 +71,42 @@ async def lifespan(app: FastAPI):
     # Enforce production DB policy at startup
     settings.enforce_production_database()
 
-    # Run incremental seed: ensure all data exists in DB
-    try:
-        from app.db.seed import seed_database, ensure_seed_invoices, seed_telugu_class_9c, seed_requested_users
-        from app.db.session import SessionLocal as _SL
-        _db = _SL()
-        try:
-            seed_database(_db)
-            ensure_seed_invoices(_db)
-            # seed_dhanush_family() intentionally NOT called — it created ghost .edu
-            # duplicates of the canonical .com accounts in seed_requested_users().
-            seed_telugu_class_9c(_db)
-            seed_requested_users(_db)
-        finally:
-            _db.close()
-    except Exception as _seed_err:
-        print(f"[WARNING] Seed step failed (non-fatal): {_seed_err}")
+    # -----------------------------------------------------------------------
+    # Seed runs in a background thread AFTER yield so the server passes
+    # Railway's health check immediately (~2 s) instead of timing out during
+    # the 30-90 s seed against remote Supabase PostgreSQL → was causing 502.
+    # The seed is idempotent so it is safe to defer and run after boot.
+    # -----------------------------------------------------------------------
+    import threading
 
-    yield
+    def _run_seed() -> None:
+        try:
+            from app.db.seed import (
+                seed_database, ensure_seed_invoices,
+                seed_telugu_class_9c, seed_requested_users,
+            )
+            from app.db.session import SessionLocal as _SL
+            _db = _SL()
+            try:
+                print("[Seed] Background seed starting...")
+                seed_database(_db)
+                ensure_seed_invoices(_db)
+                # seed_dhanush_family() intentionally NOT called — ghost .edu duplicates
+                seed_telugu_class_9c(_db)
+                seed_requested_users(_db)
+                print("[Seed] Background seed complete.")
+            finally:
+                _db.close()
+        except Exception as _err:
+            print(f"[Seed] WARNING — seed failed (non-fatal): {_err}")
+
+    yield  # server is live & healthy from here — health check passes immediately
+
+    # Start seed after server is ready (daemon=True so it won't block shutdown)
+    threading.Thread(target=_run_seed, daemon=True, name="db-seed").start()
 
     print(f"[{settings.APP_NAME}] Shutting down.")
+
 
 
 # ---------------------------------------------------------------------------
