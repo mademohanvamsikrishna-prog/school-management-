@@ -563,11 +563,11 @@ export default function MyClassesScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#F3F0FF',
+    backgroundColor: '#FFFFFF',
   },
   outerContainer: {
     flex: 1,
-    backgroundColor: '#F3F0FF',
+    backgroundColor: '#FFFFFF',
   },
   mainScroll: {
     flex: 1,
