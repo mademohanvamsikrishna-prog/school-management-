@@ -44,6 +44,8 @@ backend/**/__pycache__/
 backend/**/*.pyc
 backend/.env
 backend/*.db
+*.db
+school.db
 backend/.pytest_cache/
 backend/.mypy_cache/
 
