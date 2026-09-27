@@ -71,14 +71,15 @@ export default function TeacherLayout() {
       />
 
       {/* ── Hidden from tab bar — accessible via sidebar ── */}
-      <Tabs.Screen name="classes"       options={{ href: null }} />
-      <Tabs.Screen name="timetable"     options={{ href: null }} />
-      <Tabs.Screen name="assignments"   options={{ href: null }} />
-      <Tabs.Screen name="notifications" options={{ href: null }} />
-      <Tabs.Screen name="chat"          options={{ href: null }} />
-      <Tabs.Screen name="tasks"         options={{ href: null }} />
-      <Tabs.Screen name="settings"      options={{ href: null }} />
-      <Tabs.Screen name="help"          options={{ href: null }} />
+      <Tabs.Screen name="classes"            options={{ href: null }} />
+      <Tabs.Screen name="timetable"          options={{ href: null }} />
+      <Tabs.Screen name="leave-applications" options={{ href: null }} />
+      <Tabs.Screen name="assignments"        options={{ href: null }} />
+      <Tabs.Screen name="notifications"      options={{ href: null }} />
+      <Tabs.Screen name="chat"               options={{ href: null }} />
+      <Tabs.Screen name="tasks"              options={{ href: null }} />
+      <Tabs.Screen name="settings"           options={{ href: null }} />
+      <Tabs.Screen name="help"               options={{ href: null }} />
     </Tabs>
   );
 
