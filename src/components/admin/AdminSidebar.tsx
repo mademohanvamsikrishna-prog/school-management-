@@ -50,6 +50,7 @@ export const AdminSidebar: React.FC = () => {
         { label: 'Admissions', icon: '👤⁺', route: '/admin/admissions' },
         { label: 'Fee Management', icon: '₹', route: '/admin/fees' },
         { label: 'Staff Management', icon: '👥', route: '/admin/staff' },
+        { label: 'Staff Salary', icon: '💳', route: '/admin/staff-salary' },
         { label: 'Events & Announcements', icon: '📢', route: '/admin/events' },
         { label: 'Reports & Analytics', icon: '📈', route: '/admin/analytics' },
       ],
@@ -142,6 +143,20 @@ export const AdminSidebar: React.FC = () => {
             </View>
           </View>
         ))}
+
+        {/* Promo / Mission Banner */}
+        <View style={styles.promoBanner}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.promoTitle}>Knowledge</Text>
+            <Text style={styles.promoTitle}>today</Text>
+            <Text style={styles.promoSub}>A brighter</Text>
+            <Text style={styles.promoSub}>tomorrow</Text>
+          </View>
+          <View style={{ alignItems: 'center', justifyContent: 'center' }}>
+            <Text style={{ fontSize: 24 }}>💡</Text>
+            <Text style={{ fontSize: 18, marginTop: -6 }}>📚</Text>
+          </View>
+        </View>
 
         {/* Logout button at bottom of system */}
         <TouchableOpacity
@@ -301,5 +316,34 @@ const styles = StyleSheet.create({
     fontSize: 12.5,
     fontWeight: '700',
     color: '#EF4444',
+  },
+  promoBanner: {
+    marginTop: 14,
+    marginBottom: 4,
+    padding: 12,
+    borderRadius: 14,
+    backgroundColor: '#E0F2FE',
+    borderWidth: 1,
+    borderColor: '#BAE6FD',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    shadowColor: '#0284C7',
+    shadowOpacity: 0.08,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  promoTitle: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#0369A1',
+    lineHeight: 15,
+  },
+  promoSub: {
+    fontSize: 10.5,
+    fontWeight: '600',
+    color: '#0284C7',
+    lineHeight: 14,
   },
 });

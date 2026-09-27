@@ -9,6 +9,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 from app.core.config import settings
 from app.models import Base
+from app.db.session import _make_db_url
 
 # this is the Alembic Config object
 config = context.config
@@ -18,8 +19,10 @@ if config.config_file_name is not None:
 
 target_metadata = Base.metadata
 
+db_url = _make_db_url(settings.DATABASE_URL)
+
 # Override sqlalchemy.url with the application configuration
-config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
+config.set_main_option("sqlalchemy.url", db_url)
 
 
 def run_migrations_offline() -> None:
@@ -37,7 +40,7 @@ def run_migrations_offline() -> None:
 
 def run_migrations_online() -> None:
     configuration = config.get_section(config.config_ini_section, {})
-    configuration["sqlalchemy.url"] = settings.DATABASE_URL
+    configuration["sqlalchemy.url"] = db_url
 
     connect_args = {}
     if settings.DATABASE_URL.startswith("sqlite"):

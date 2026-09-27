@@ -1,8 +1,9 @@
 /**
  * AdminStaffScreen — Dedicated Staff Management
  * Route: /admin/staff
+ * Real backend database synchronization with User & Role models.
  */
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -12,7 +13,12 @@ import {
   SafeAreaView,
   TextInput,
   Modal,
+  ActivityIndicator,
+  Platform,
 } from 'react-native';
+import { listUsers, createUser, listRoles, AdminUser, AdminRole } from '../../services/admin';
+
+const IS_WEB = Platform.OS === 'web';
 
 const P = {
   bg: '#F7FAFF',
@@ -26,55 +32,77 @@ const P = {
   purple: '#8B5CF6',
 };
 
-interface StaffMember {
-  id: string;
-  name: string;
-  department: string;
-  designation: string;
-  email: string;
-  phone: string;
-  status: 'active' | 'inactive';
-}
-
 export default function AdminStaffScreen() {
+  const [staffList, setStaffList] = useState<AdminUser[]>([]);
+  const [roles, setRoles] = useState<AdminRole[]>([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [addModal, setAddModal] = useState(false);
   const [name, setName] = useState('');
   const [department, setDepartment] = useState('Administration');
-  const [designation, setDesignation] = useState('Finance Officer');
+  const [designation, setDesignation] = useState('Administrative Officer');
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [saving, setSaving] = useState(false);
 
-  const [staffList, setStaffList] = useState<StaffMember[]>([
-    { id: 'st-1', name: 'Ramesh Chander', department: 'Administration', designation: 'Senior Administrative Officer', email: 'ramesh.c@school.edu', phone: '+91 98450 11223', status: 'active' },
-    { id: 'st-2', name: 'Alka Saxena', department: 'Accounts & Finance', designation: 'Chief Accountant', email: 'alka.s@school.edu', phone: '+91 98710 44556', status: 'active' },
-    { id: 'st-3', name: 'Mohan Lal', department: 'IT & Infrastructure', designation: 'Systems Administrator', email: 'mohan.l@school.edu', phone: '+91 98220 77889', status: 'active' },
-    { id: 'st-4', name: 'Geeta Kumari', department: 'Library Services', designation: 'Head Librarian', email: 'geeta.k@school.edu', phone: '+91 98330 99001', status: 'active' },
-    { id: 'st-5', name: 'Devendra Yadav', department: 'Transport & Security', designation: 'Fleet Supervisor', email: 'devendra.y@school.edu', phone: '+91 98110 33445', status: 'active' },
-  ]);
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [usersData, rolesData] = await Promise.all([
+        listUsers('staff'),
+        listRoles(),
+      ]);
+      setStaffList(usersData);
+      setRoles(rolesData);
+    } catch (e) {
+      console.warn('Failed to load staff:', e);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
-  const handleAddStaff = () => {
-    if (!name.trim() || !email.trim()) return;
-    setStaffList((prev) => [
-      {
-        id: String(Date.now()),
-        name,
-        department,
-        designation,
-        email,
-        phone: '+91 98000 00000',
-        status: 'active',
-      },
-      ...prev,
-    ]);
-    setName('');
-    setEmail('');
-    setAddModal(false);
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  const handleAddStaff = async () => {
+    if (!name.trim() || !email.trim()) {
+      alert('Please enter Name and Email');
+      return;
+    }
+
+    const staffRole = roles.find((r) => r.name === 'staff') || roles.find((r) => r.name === 'teacher');
+    if (!staffRole) {
+      alert('Staff role not found');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      await createUser({
+        name: name.trim(),
+        email: email.trim().toLowerCase(),
+        password: password.trim() || 'password123',
+        role_id: staffRole.id,
+      });
+      setName('');
+      setEmail('');
+      setPassword('');
+      setAddModal(false);
+      await loadData();
+    } catch (err: any) {
+      alert(err?.message || 'Failed to create staff member');
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const filteredStaff = staffList.filter((s) => {
-    const q = search.toLowerCase();
-    return s.name.toLowerCase().includes(q) || s.department.toLowerCase().includes(q) || s.designation.toLowerCase().includes(q);
-  });
+  const filteredStaff = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return staffList.filter((s) => {
+      return !q || s.name.toLowerCase().includes(q) || s.email.toLowerCase().includes(q);
+    });
+  }, [staffList, search]);
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -96,12 +124,14 @@ export default function AdminStaffScreen() {
             <Text style={styles.statValue}>{staffList.length}</Text>
           </View>
           <View style={styles.statCard}>
-            <Text style={styles.statLabel}>Departments</Text>
-            <Text style={[styles.statValue, { color: P.purple }]}>5</Text>
+            <Text style={styles.statLabel}>Active Duty</Text>
+            <Text style={[styles.statValue, { color: P.green }]}>
+              {staffList.filter((s) => s.is_active).length}
+            </Text>
           </View>
           <View style={styles.statCard}>
-            <Text style={styles.statLabel}>Active Duty</Text>
-            <Text style={[styles.statValue, { color: P.green }]}>100%</Text>
+            <Text style={styles.statLabel}>Role Type</Text>
+            <Text style={[styles.statValue, { color: P.purple }]}>Support Staff</Text>
           </View>
         </View>
 
@@ -111,7 +141,7 @@ export default function AdminStaffScreen() {
             <Text style={{ fontSize: 13, color: P.textMuted }}>🔍</Text>
             <TextInput
               style={styles.searchInput}
-              placeholder="Search staff by name, department or designation..."
+              placeholder="Search staff by name or email..."
               placeholderTextColor={P.textMuted}
               value={search}
               onChangeText={setSearch}
@@ -123,37 +153,47 @@ export default function AdminStaffScreen() {
         <View style={styles.tableCard}>
           <View style={styles.tableHeader}>
             <Text style={[styles.th, { flex: 2 }]}>STAFF NAME</Text>
+            <Text style={[styles.th, { flex: 2 }]}>EMAIL</Text>
             <Text style={[styles.th, { flex: 1.5 }]}>DEPARTMENT</Text>
-            <Text style={[styles.th, { flex: 1.5 }]}>DESIGNATION</Text>
-            <Text style={[styles.th, { flex: 1.5 }]}>EMAIL & CONTACT</Text>
             <Text style={[styles.th, { width: 100, textAlign: 'right' }]}>STATUS</Text>
           </View>
 
-          <FlatList
-            data={filteredStaff}
-            keyExtractor={(item) => item.id}
-            renderItem={({ item }) => (
-              <View style={styles.tableRow}>
-                <View style={{ flex: 2, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                  <View style={styles.avatar}>
-                    <Text style={styles.avatarText}>{item.name[0]}</Text>
+          {loading ? (
+            <View style={{ padding: 40, alignItems: 'center' }}>
+              <ActivityIndicator size="large" color={P.primary} />
+            </View>
+          ) : filteredStaff.length === 0 ? (
+            <View style={{ padding: 40, alignItems: 'center' }}>
+              <Text style={{ color: P.textMuted, fontSize: 14 }}>No staff members found.</Text>
+            </View>
+          ) : (
+            <FlatList
+              data={filteredStaff}
+              keyExtractor={(item) => item.id}
+              renderItem={({ item }) => (
+                <View style={styles.tableRow}>
+                  <View style={{ flex: 2, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                    <View style={styles.avatar}>
+                      <Text style={styles.avatarText}>{item.name[0]?.toUpperCase()}</Text>
+                    </View>
+                    <View>
+                      <Text style={styles.staffName}>{item.name}</Text>
+                      <Text style={{ fontSize: 11, color: P.textMuted }}>ID: {item.id.slice(0, 8)}</Text>
+                    </View>
                   </View>
-                  <Text style={styles.staffName}>{item.name}</Text>
-                </View>
-                <Text style={[styles.td, { flex: 1.5, fontWeight: '600' }]}>{item.department}</Text>
-                <Text style={[styles.td, { flex: 1.5, color: P.textSec }]}>{item.designation}</Text>
-                <View style={{ flex: 1.5 }}>
-                  <Text style={styles.staffEmail}>{item.email}</Text>
-                  <Text style={styles.staffPhone}>{item.phone}</Text>
-                </View>
-                <View style={{ width: 100, alignItems: 'flex-end' }}>
-                  <View style={styles.statusBadge}>
-                    <Text style={styles.statusText}>ACTIVE</Text>
+                  <Text style={[styles.td, { flex: 2, color: P.textSec }]}>{item.email}</Text>
+                  <Text style={[styles.td, { flex: 1.5, fontWeight: '600' }]}>Administration</Text>
+                  <View style={{ width: 100, alignItems: 'flex-end' }}>
+                    <View style={[styles.statusBadge, { backgroundColor: item.is_active ? '#DCFCE7' : '#FEE2E2' }]}>
+                      <Text style={[styles.statusText, { color: item.is_active ? '#15803D' : '#DC2626' }]}>
+                        {item.is_active ? 'ACTIVE' : 'INACTIVE'}
+                      </Text>
+                    </View>
                   </View>
                 </View>
-              </View>
-            )}
-          />
+              )}
+            />
+          )}
         </View>
       </View>
 
@@ -164,28 +204,24 @@ export default function AdminStaffScreen() {
             <View style={styles.modalCard}>
               <Text style={styles.modalHeading}>Add Staff Member</Text>
               <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Full Name</Text>
+                <Text style={styles.inputLabel}>Full Name *</Text>
                 <TextInput style={styles.modalInput} value={name} onChangeText={setName} placeholder="e.g. Ramesh Chander" />
               </View>
               <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Department</Text>
-                <TextInput style={styles.modalInput} value={department} onChangeText={setDepartment} />
-              </View>
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Designation</Text>
-                <TextInput style={styles.modalInput} value={designation} onChangeText={setDesignation} />
-              </View>
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Official Email</Text>
+                <Text style={styles.inputLabel}>Official Email *</Text>
                 <TextInput style={styles.modalInput} value={email} onChangeText={setEmail} autoCapitalize="none" placeholder="staff@school.edu" />
+              </View>
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Initial Password</Text>
+                <TextInput style={styles.modalInput} value={password} onChangeText={setPassword} placeholder="Default: password123" secureTextEntry />
               </View>
 
               <View style={styles.modalButtons}>
                 <TouchableOpacity style={styles.cancelBtn} onPress={() => setAddModal(false)}>
                   <Text style={styles.cancelBtnText}>Cancel</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.saveBtn} onPress={handleAddStaff}>
-                  <Text style={styles.saveBtnText}>Save Staff</Text>
+                <TouchableOpacity style={styles.saveBtn} onPress={handleAddStaff} disabled={saving}>
+                  <Text style={styles.saveBtnText}>{saving ? 'Saving...' : 'Save Staff'}</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -219,10 +255,8 @@ const styles = StyleSheet.create({
   avatar: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#8B5CF6', alignItems: 'center', justifyContent: 'center' },
   avatarText: { color: '#FFFFFF', fontWeight: '800', fontSize: 12 },
   staffName: { fontSize: 13, fontWeight: '700', color: P.text },
-  staffEmail: { fontSize: 11, color: P.textSec },
-  staffPhone: { fontSize: 10.5, color: P.textMuted },
-  statusBadge: { backgroundColor: '#DCFCE7', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
-  statusText: { fontSize: 10, fontWeight: '800', color: '#15803D' },
+  statusBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
+  statusText: { fontSize: 10, fontWeight: '800' },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(15,23,42,0.6)', alignItems: 'center', justifyContent: 'center', padding: 20 },
   modalCard: { backgroundColor: '#FFFFFF', borderRadius: 18, padding: 24, width: '100%', maxWidth: 440 },
   modalHeading: { fontSize: 18, fontWeight: '800', color: P.text, marginBottom: 16 },
