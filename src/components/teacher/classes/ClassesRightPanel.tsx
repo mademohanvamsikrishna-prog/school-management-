@@ -286,6 +286,10 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
     borderRadius: 6,
   },
+  scheduleBadgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+  },
   badgeCurrent: {
     backgroundColor: '#D1FAE5',
   },

@@ -153,9 +153,9 @@ export default function ParentsLayout() {
       <AuthGuard allowedRoles={['parent', 'admin']}>
         <ParentChildProvider>
           <ParentDataProvider>
-            <View style={{ flex: 1, flexDirection: 'row', backgroundColor: '#F1F5F9' }}>
+            <View style={{ flex: 1, flexDirection: 'row', backgroundColor: '#F1F5F9', height: '100vh' as any, overflow: 'hidden' }}>
               <ParentSidebar />
-              <View style={{ flex: 1, overflow: 'hidden' }}>
+              <View style={{ flex: 1, overflow: 'hidden', height: '100%' }}>
                 {tabs}
               </View>
             </View>
