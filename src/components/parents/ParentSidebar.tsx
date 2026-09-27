@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Platform, Image } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Platform, Image, ScrollView } from 'react-native';
 import { useRouter, usePathname } from 'expo-router';
 import { COLORS, SIZES, FONTS, SHADOWS } from '../../constants/theme';
 import { useParentData } from '../../context/ParentDataContext';
@@ -88,35 +88,42 @@ export const ParentSidebar: React.FC = () => {
 
       <View style={styles.divider} />
 
-      {/* Main Nav Items */}
-      <View style={styles.navGroup}>
-        {primaryNav.map(renderNavItem)}
-      </View>
+      {/* Independently scrollable navigation & content area */}
+      <ScrollView
+        style={styles.scrollArea}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Main Nav Items */}
+        <View style={styles.navGroup}>
+          {primaryNav.map(renderNavItem)}
+        </View>
 
-      {/* Section Header: Other */}
-      <View style={styles.sectionHeaderWrap}>
-        <Text style={styles.sectionHeaderText}>Other</Text>
-      </View>
+        {/* Section Header: Other */}
+        <View style={styles.sectionHeaderWrap}>
+          <Text style={styles.sectionHeaderText}>Other</Text>
+        </View>
 
-      <View style={styles.navGroup}>
-        {OTHER_NAV.map(renderNavItem)}
-      </View>
+        <View style={styles.navGroup}>
+          {OTHER_NAV.map(renderNavItem)}
+        </View>
 
-      <View style={{ flex: 1, minHeight: 16 }} />
+        <View style={styles.spacer} />
 
-      {/* Stay Connected Bottom Promo Card */}
-      <View style={styles.stayConnectedCard}>
-        <FamilyIllustrationSmall />
-        <Text style={styles.stayConnectedTitle}>Stay Connected</Text>
-        <Text style={styles.stayConnectedSub}>Support your child's learning journey</Text>
-        <TouchableOpacity
-          style={styles.stayConnectedBtn}
-          onPress={() => router.push('/parents/messages' as any)}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.stayConnectedArrow}>→</Text>
-        </TouchableOpacity>
-      </View>
+        {/* Stay Connected Bottom Promo Card */}
+        <View style={styles.stayConnectedCard}>
+          <FamilyIllustrationSmall />
+          <Text style={styles.stayConnectedTitle}>Stay Connected</Text>
+          <Text style={styles.stayConnectedSub}>Support your child's learning journey</Text>
+          <TouchableOpacity
+            style={styles.stayConnectedBtn}
+            onPress={() => router.push('/parents/messages' as any)}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.stayConnectedArrow}>→</Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
     </View>
   );
 };
@@ -128,9 +135,40 @@ const styles = StyleSheet.create({
     borderRightWidth: 1,
     borderRightColor: '#EDF2F7',
     paddingTop: SIZES.lg,
-    paddingBottom: SIZES.md,
+    paddingBottom: 0,
     ...SHADOWS.small,
     zIndex: 10,
+    flexDirection: 'column',
+    height: IS_WEB ? ('100vh' as any) : '100%',
+    ...(IS_WEB
+      ? {
+          position: 'sticky' as any,
+          top: 0,
+          maxHeight: '100vh' as any,
+          alignSelf: 'flex-start' as any,
+          boxSizing: 'border-box' as any,
+        }
+      : {}),
+  },
+  scrollArea: {
+    flex: 1,
+    minHeight: 0,
+    ...(IS_WEB
+      ? {
+          overflowY: 'auto' as any,
+          overflowX: 'hidden' as any,
+          scrollbarWidth: 'thin' as any,
+        }
+      : {}),
+  },
+  scrollContent: {
+    flexGrow: 1,
+    paddingBottom: SIZES.md,
+    justifyContent: 'space-between',
+  },
+  spacer: {
+    minHeight: 16,
+    flex: 1,
   },
   brand: {
     flexDirection: 'row',
@@ -233,7 +271,7 @@ const styles = StyleSheet.create({
   // Stay Connected card
   stayConnectedCard: {
     marginHorizontal: 14,
-    marginTop: 'auto',
+    marginTop: 16,
     backgroundColor: '#DFEEFD',
     ...(IS_WEB
       ? {

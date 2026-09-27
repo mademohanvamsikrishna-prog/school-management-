@@ -7,7 +7,7 @@ export interface TimetableEntryItem {
   class_name: string;
   subject_id: string;
   subject_name: string;
-  day_of_week: int; // 1=Mon...6=Sat
+  day_of_week: number; // 1=Mon...6=Sat
   start_time: string; // e.g. "08:30" or "08:30:00"
   end_time: string; // e.g. "09:15" or "09:15:00"
   room_number: string;
