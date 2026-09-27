@@ -32,3 +32,22 @@ class StaffPerformanceRecord(Base, TimestampMixin):
 
     staff = relationship("User", foreign_keys=[staff_id])
     reviewer = relationship("User", foreign_keys=[reviewer_id])
+
+
+class StaffSalaryRecord(Base, TimestampMixin):
+    __tablename__ = "staff_salary_records"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
+    staff_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False)
+    month_year: Mapped[str] = mapped_column(String(30), nullable=False)  # e.g. "October 2026"
+    monthly_salary: Mapped[float] = mapped_column(Float, nullable=False)
+    allowance: Mapped[float] = mapped_column(Float, default=0.0)
+    deductions: Mapped[float] = mapped_column(Float, default=0.0)
+    status: Mapped[str] = mapped_column(String(20), default="Paid")  # "Paid" | "Pending"
+    last_paid_date: Mapped[Optional[str]] = mapped_column(String(30), nullable=True)
+    payment_method: Mapped[Optional[str]] = mapped_column(String(50), default="Direct Bank Transfer")
+    transaction_ref: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    staff = relationship("User", foreign_keys=[staff_id])
+
