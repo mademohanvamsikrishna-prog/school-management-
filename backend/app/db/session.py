@@ -19,6 +19,11 @@ db_url = _make_db_url(settings.DATABASE_URL)
 engine_kwargs = {}
 if is_sqlite:
     engine_kwargs["connect_args"] = {"check_same_thread": False}
+else:
+    # Remote PostgreSQL (Supabase / Railway pooler): ping connections before checkout
+    # and recycle every 5 minutes to avoid dropped SSL connections causing 500 errors.
+    engine_kwargs["pool_pre_ping"] = True
+    engine_kwargs["pool_recycle"] = 300
 
 engine = create_engine(
     db_url,

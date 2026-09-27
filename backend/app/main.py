@@ -22,9 +22,9 @@ import time
 from contextlib import asynccontextmanager
 from typing import Any, Dict
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 
 from app.core.config import settings
 
@@ -150,24 +150,44 @@ def create_application() -> FastAPI:
     )
 
     # -----------------------------------------------------------------------
+    # Unhandled Exception Handler Middleware
+    # Catches unexpected server errors (500) so that CORSMiddleware (outer)
+    # can attach CORS headers to the response.
+    # Without this, unhandled exceptions bubble up to Starlette's
+    # ServerErrorMiddleware which omits Access-Control-Allow-Origin,
+    # causing browsers to mask backend 500 errors as CORS violations.
+    # -----------------------------------------------------------------------
+    @application.middleware("http")
+    async def catch_exceptions_middleware(request: Request, call_next):
+        try:
+            return await call_next(request)
+        except HTTPException:
+            raise
+        except Exception as exc:
+            import traceback
+            traceback.print_exc()
+            return JSONResponse(
+                status_code=500,
+                content={
+                    "detail": "An internal server error occurred.",
+                    "error": str(exc),
+                },
+            )
+
+    # -----------------------------------------------------------------------
     # CORS Middleware
-    # Origins are managed via CORS_ORIGINS env var → settings.get_cors_origins()
-    # NOTE: "*" wildcard is blocked at settings level when credentials=True
+    # Added before any routers or route definitions.
+    # Added after error middleware so CORSMiddleware wraps the entire stack.
     # -----------------------------------------------------------------------
     application.add_middleware(
         CORSMiddleware,
         allow_origins=settings.get_cors_origins(),
-        # Covers ALL *.vercel.app preview deployments for this project.
-        # Matches any subdomain starting with "school-management":
-        #   https://school-management-smoky-six.vercel.app
-        #   https://school-management-bs76lyshn-mademohanvamsikrishna-8090.vercel.app
-        #   https://school-management-git-main-mademohanvamsikrishna-8090.vercel.app
-        allow_origin_regex=r"https://school-management[a-z0-9A-Z\-]*\.vercel\.app",
+        # Supports dynamic Vercel preview deployments and production domains:
+        allow_origin_regex=r"^https:\/\/.*\.vercel\.app$",
         allow_credentials=True,
-        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-        allow_headers=["Authorization", "Content-Type", "Accept", "X-Request-ID"],
+        allow_methods=["*"],
+        allow_headers=["*"],
     )
-
 
     # -----------------------------------------------------------------------
     # Mount API v1 router
@@ -193,8 +213,6 @@ app = create_application()
 # lifespan runs, so it responds immediately with 204 No Content as soon as
 # Uvicorn/Gunicorn accepts the connection — unblocking the browser preflight.
 # ---------------------------------------------------------------------------
-
-from fastapi.responses import Response
 
 @app.options("/{rest_of_path:path}", include_in_schema=False)
 async def preflight_handler(rest_of_path: str) -> Response:

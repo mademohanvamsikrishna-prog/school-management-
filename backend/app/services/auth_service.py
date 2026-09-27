@@ -88,8 +88,15 @@ def login(db: Session, email: str, password: str) -> TokenResponse:
     # Issue tokens
     raw_access = create_access_token(subject=user.id)
     raw_refresh = generate_refresh_token()
-    user_repository.create_refresh_token_record(db, user_id=user.id, raw_token=raw_refresh)
-    db.commit()
+    try:
+        user_repository.create_refresh_token_record(db, user_id=user.id, raw_token=raw_refresh)
+        db.commit()
+    except Exception as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to persist login session. Please try again.",
+        ) from exc
 
     return _build_token_response(user, raw_access, raw_refresh)
 
@@ -114,8 +121,11 @@ def refresh_tokens(db: Session, raw_refresh_token: str) -> TokenResponse:
         expires_at = expires_at.replace(tzinfo=timezone.utc)
     if expires_at < datetime.now(timezone.utc):
         # Clean up the expired record
-        db.delete(record)
-        db.commit()
+        try:
+            db.delete(record)
+            db.commit()
+        except Exception:
+            db.rollback()
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Refresh token has expired. Please log in again.",
@@ -130,11 +140,18 @@ def refresh_tokens(db: Session, raw_refresh_token: str) -> TokenResponse:
         )
 
     # Token rotation: revoke old, issue new
-    db.delete(record)
-    raw_access = create_access_token(subject=user.id)
-    raw_refresh = generate_refresh_token()
-    user_repository.create_refresh_token_record(db, user_id=user.id, raw_token=raw_refresh)
-    db.commit()
+    try:
+        db.delete(record)
+        raw_access = create_access_token(subject=user.id)
+        raw_refresh = generate_refresh_token()
+        user_repository.create_refresh_token_record(db, user_id=user.id, raw_token=raw_refresh)
+        db.commit()
+    except Exception as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to rotate refresh token. Please try again.",
+        ) from exc
 
     return _build_token_response(user, raw_access, raw_refresh)
 

@@ -48,8 +48,8 @@ class UserMeResponse(BaseModel):
     name: str
     is_active: bool
     avatar_url: Optional[str] = None
-    role: RoleSchema
-    permissions: List[str]
+    role: Optional[RoleSchema] = None
+    permissions: List[str] = []
 
     model_config = {"from_attributes": True}
 

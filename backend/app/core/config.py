@@ -30,16 +30,19 @@ class Settings(BaseSettings):
     # DO NOT use "*" — it is incompatible with allow_credentials=True (CORS spec).
     CORS_ORIGINS: Union[str, List[str]] = (
         # ── Production frontends (always allowed) ─────────────────────────
+        "https://school-management-axyqm7yms-mademohanvamsikrishna-8090.vercel.app,"
         "https://school-management-smoky-six.vercel.app,"
         "https://school-management-git-main-mademohanvamsikrishna-8090.vercel.app,"
         # ── Vercel preview deployments (new URL per commit) ────────────────
         "https://school-management-e2xcjn0am-mademohanvamsikrishna-8090.vercel.app,"
         # ── Local development ─────────────────────────────────────────────
+        "http://localhost:3000,"
+        "http://localhost:5173,"
         "http://localhost:8081,"
         "http://localhost:19006,"
-        "http://localhost:5173,"
-        "http://localhost:3000,"
         "http://localhost:8000,"
+        "http://127.0.0.1:3000,"
+        "http://127.0.0.1:5173,"
         "http://127.0.0.1:8081,"
         "http://127.0.0.1:8000"
     )
@@ -79,14 +82,8 @@ class Settings(BaseSettings):
     def get_cors_origins(self) -> List[str]:
         """
         Return the parsed CORS origins list.
-        In production, only explicitly configured origins are returned.
-        In development/testing, localhost entries are always included for convenience.
-
-        NOTE: Vercel generates a unique preview URL for every deployment.
-        Rather than updating config.py on every deploy, set CORS_ORIGINS as a
-        Railway environment variable containing all allowed origins as a
-        comma-separated list, e.g.:
-          CORS_ORIGINS=https://school-management-smoky-six.vercel.app,https://school-management-e2xcjn0am-mademohanvamsikrishna-8090.vercel.app
+        Always guarantees that the active Vercel frontend, production domains,
+        and common local development URLs are present.
         """
         origins: List[str] = (
             self.CORS_ORIGINS
@@ -94,20 +91,23 @@ class Settings(BaseSettings):
             else [o.strip() for o in self.CORS_ORIGINS.split(",") if o.strip()]
         )
 
-        is_prod = self.ENVIRONMENT.lower() in ("production", "prod")
-        if not is_prod:
-            # Ensure local dev origins are always present in non-production
-            local_origins = [
-                "http://localhost:8081",
-                "http://localhost:19006",
-                "http://localhost:3000",
-                "http://localhost:8000",
-                "http://127.0.0.1:8081",
-                "http://127.0.0.1:8000",
-            ]
-            for lo in local_origins:
-                if lo not in origins:
-                    origins.append(lo)
+        mandatory_origins = [
+            "https://school-management-axyqm7yms-mademohanvamsikrishna-8090.vercel.app",
+            "https://school-management-smoky-six.vercel.app",
+            "https://school-management-git-main-mademohanvamsikrishna-8090.vercel.app",
+            "http://localhost:3000",
+            "http://localhost:5173",
+            "http://localhost:8081",
+            "http://localhost:19006",
+            "http://localhost:8000",
+            "http://127.0.0.1:3000",
+            "http://127.0.0.1:5173",
+            "http://127.0.0.1:8081",
+            "http://127.0.0.1:8000",
+        ]
+        for mo in mandatory_origins:
+            if mo not in origins:
+                origins.append(mo)
 
         return origins
 
