@@ -243,7 +243,7 @@ export const StudentsTable: React.FC<StudentsTableProps> = ({
 
             <Text style={[styles.th, { flex: 1 }]}>GENDER</Text>
 
-            <TouchableOpacity style={[styles.thBtn, { flex: 1.2, textAlign: 'center' }]} onPress={() => handleHeaderSort('status')}>
+            <TouchableOpacity style={[styles.thBtn, { flex: 1.2, alignItems: 'center' }]} onPress={() => handleHeaderSort('status')}>
               <Text style={styles.th}>STATUS {sortField === 'status' ? (sortDir === 'asc' ? '▲' : '▼') : ''}</Text>
             </TouchableOpacity>
 

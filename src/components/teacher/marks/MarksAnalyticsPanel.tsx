@@ -472,6 +472,10 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
     borderRadius: 6,
   },
+  statusBadgeText: {
+    fontSize: 11,
+    fontWeight: '800',
+  },
   statusPublished: { backgroundColor: '#D1FAE5' },
   statusPublishedText: { color: '#059669', fontSize: 11, fontWeight: '800' },
   statusDraft: { backgroundColor: '#FEF3C7' },
